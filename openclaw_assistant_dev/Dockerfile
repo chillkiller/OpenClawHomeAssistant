@@ -1,5 +1,5 @@
-# OpenClaw Home Assistant Addon - Dev Channel (Beta)
-# Baut OpenClaw aus deinem Fork für Zugang zu Fixes und experimentellen Features
+# OpenClaw Home Assistant Addon - Dev Channel
+# Baut OpenClaw aus chillkiller/openclaw Fork mit Subagent-Fix (v2026.4.8-patch1)
 
 ARG BUILD_FROM=ghcr.io/hassio-addons/debian-base:7.3.4
 FROM ${BUILD_FROM} AS builder

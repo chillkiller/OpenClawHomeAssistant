@@ -1,5 +1,5 @@
-# OpenClaw Home Assistant Addon - Latest Channel
-# Baut OpenClaw aus dem offiziellen Repo mit latest Version
+# OpenClaw Home Assistant Addon - Stable Channel (v2026.3.28)
+# Baut OpenClaw aus dem offiziellen Repo - letzte Version ohne Multi-Agenten Bug
 
 ARG BUILD_FROM=ghcr.io/hassio-addons/debian-base:7.3.4
 FROM ${BUILD_FROM} AS builder
@@ -19,7 +19,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs
 
 # OpenClaw Source (Offizielles Repo - Stable)
-ARG OPENCLAW_VERSION=latest
+ARG OPENCLAW_VERSION=2026.3.28
 ARG OPENCLAW_REPO=https://github.com/openclaw/openclaw.git
 
 WORKDIR /tmp/openclaw
