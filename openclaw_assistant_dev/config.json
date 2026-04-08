@@ -1,8 +1,8 @@
 {
-  "name": "OpenClaw Beta",
+  "name": "OpenClaw Dev",
   "version": "2026.4.8-patch1-1",
-  "slug": "openclaw_beta",
-  "description": "Beta channel for OpenClaw - Includes fixes for subagent spawning and multi-agent systems.",
+  "slug": "openclaw_dev",
+  "description": "OpenClaw Dev with subagent fix (chillkiller/openclaw@v2026.4.8-patch1)",
   "url": "https://github.com/chillkiller/OpenClawHomeAssistant",
   "arch": ["aarch64", "amd64", "armv7"],
   "map": [
@@ -47,7 +47,7 @@
       "enabled": "bool"
     }
   },
-  "image": "chillkiller/{arch}-openclaw-beta",
+  "image": "chillkiller/{arch}-openclaw-dev",
   "init": false,
   "host_network": false,
   "privileged": [],
