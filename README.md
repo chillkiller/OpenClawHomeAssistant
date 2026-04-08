@@ -1,78 +1,52 @@
-# OpenClaw Ultimate - Home Assistant Addon
+# OpenClaw Assistant – Home Assistant App/Add-on
 
-Das ultimative OpenClaw Home Assistant Addon mit voller Kontrolle über Versionen, Multi-Agent Support und eingebettetem OpenClaw Core.
+## [Join our Discord Server!](https://discord.gg/xeHeKu9jYp)
+<img width="1038" height="597" alt="image" src="https://github.com/user-attachments/assets/6dae3918-7bad-4e89-9695-c7f549e8abda" />
+<img width="1536" height="542" alt="ChatGPT Image Feb 25, 2026, 11_37_02 PM" src="https://github.com/user-attachments/assets/ea662d87-5414-4c01-ac48-cb8f731a4988" />
 
-## Features
 
-- ✅ **Pinned Version**: Keine Überraschungen durch automatische Updates
-- ✅ **Multi-Agent Ready**: Subagenten funktionieren (v2026.3.28)
-- ✅ **QMD Memory**: Integrierter Quantum Memory Database Support
-- ✅ **GitHub Actions**: Automatische Builds für alle Architekturen
-- ✅ **Konfigurierbar**: Version, Ports, Orchestrator einstellbar
+### OpenClaw Home Assistant integration is available now!  https://github.com/techartdev/OpenClawHomeAssistantIntegration
 
-## Installation
+This repository contains a Home Assistant add-on that runs **OpenClaw** inside **Home Assistant OS (HAOS)**.
 
-1. Dieses Repository als Custom Repository in Home Assistant hinzufügen
-2. Addon "OpenClaw Ultimate" installieren
-3. Starten und Konfigurieren
+> Upstream rename history (FYI): clawdbot → moltbot → **openclaw** (final).
 
-## Konfiguration
+## Key Features
 
-```yaml
-openclaw_version: "2026.3.28"  # oder "2026.4.8" wenn Bug gefixt
-gateway_port: 18790
-control_ui_port: 18789
-log_level: info
-multi_agent:
-  enabled: true
-  orchestrator: native  # native | paperclip | antfarm
-memory:
-  backend: qmd
-  enabled: true
-```
+- **AI Gateway** — OpenClaw server with chat, skills, and automation capabilities
+- **Web Terminal** — browser-based terminal embedded in Home Assistant
+- **Assist Pipeline** — use OpenClaw as a conversation agent via the OpenAI-compatible API
+- **Browser Automation** — Chromium included for web scraping and automation skills
+- **Proxy Support** — optional outbound `http_proxy` setting for HTTP/HTTPS traffic
+- **Persistent Storage** — skills, config, and workspace survive add-on updates
+- **Bundled Tools** — git, vim, nano, bat, fd, ripgrep, curl, jq, python3, pnpm, Homebrew
 
-## Multi-Agent Setup
+## Supported Architectures
 
-### Option 1: Native (Subagenten)
-Funktioniert mit v2026.3.28. Neueere Versionen haben einen Bug (siehe OpenClaw Issue #59428).
+| Architecture | Supported |
+|---|---|
+| amd64 | ✅ |
+| aarch64 (RPi 4/5) | ✅ |
+| armv7 (RPi 3) | ✅ |
 
-### Option 2: Paperclip (kommt bald)
-Externe Orchestrierung via Paperclip Platform.
+## Documentation
 
-### Option 3: Antfarm (kommt bald)
-YAML-basierte Workflows via Antfarm.
+- **[Full documentation →](DOCS.md)** — installation, configuration, use cases, troubleshooting, and more
+- **[Security Risks & Disclaimer →](SECURITY.md)** — important risks to understand before using this add-on
 
-## Entwicklung
+## Install
 
-### Eigenen OpenClaw Fork einbinden
+1. Home Assistant → **Settings → Add-ons → Add-on store**
+2. **⋮ → Repositories**
+3. Add this repo:
+   - `https://github.com/techartdev/OpenClawHomeAssistant`
+4. Install **OpenClaw Assistant**
 
-In `Dockerfile` ändern:
-```dockerfile
-ARG OPENCLAW_REPO=https://github.com/YOUR_USERNAME/openclaw.git
-ARG OPENCLAW_BRANCH=your-fix-branch
-```
+## Star History
 
-### Build lokal testen
+[![Star History Chart](https://api.star-history.com/svg?repos=techartdev/OpenClawHomeAssistant&type=date&legend=top-left)](https://www.star-history.com/#techartdev/OpenClawHomeAssistant&type=date&legend=top-left)
 
-```bash
-docker build --build-arg BUILD_FROM=ghcr.io/hassio-addons/debian-base:7.3.4 -t openclaw-ultimate .
-```
+## Support / Donations
 
-## Troubleshooting
-
-### "pairing required" Error
-Dieser Bug existiert in v2026.4.1+. Lösung:
-- Downgrade auf v2026.3.28 in der Config
-- Oder eigenen Fork mit Fix bauen
-
-### QMD Collection nicht gefunden
-Normal beim ersten Start. QMD wird automatisch initialisiert.
-
-## Credits
-
-- Original OpenClaw: https://github.com/openclaw/openclaw
-- Home Assistant Addons: https://github.com/hassio-addons
-
-## Lizenz
-
-MIT
+If you find this useful and you want to bring me a coffee to make more useful things, or support the project, use the link below:
+- https://revolut.me/vanyo6dhw
