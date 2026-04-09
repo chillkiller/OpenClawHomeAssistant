@@ -1,5 +1,5 @@
 name: OpenClaw Assistant
-version: "latest-1"
+version: "latest-2"
 slug: openclaw
 description: OpenClaw Home Assistant Addon (latest version)
 url: https://github.com/chillkiller/OpenClawHomeAssistant

@@ -2,10 +2,10 @@
 
 All notable changes to the OpenClaw Assistant Home Assistant Add-on will be documented in this file.
 
-## [0.5.66] - 2026-04-04
+## [0.5.67] - 2026-04-09
 
-### Fixed
-- **"Open Gateway Web UI" button missing token on first boot / post-onboard** (issue #102): the gateway token was read once at startup, before `openclaw onboard` had a chance to write `openclaw.json`. The landing page now re-renders automatically in the background (up to ~2 min after startup) once the token appears in `openclaw.json`, and nginx is reloaded with SIGHUP — no add-on restart required. Existing installs with a token already present are unaffected.
+### Changed
+- Bump version to trigger update to latest OpenClaw main.
 
 ## [0.5.65] - 2026-04-04
 
