@@ -2,11 +2,13 @@
 
 All notable changes to the OpenClaw Assistant Home Assistant Add-on will be documented in this file.
 
-## [0.5.68] - 2026-04-09
+## [0.5.69] - 2026-04-09
 
 ### Changed
-- Bump OpenClaw to v2026.4.8-patch2.
-- Fixed TS build error by adding gatewayUrl to CallGatewayBaseOptions.
+- Bump OpenClaw to v2026.4.8-patch3.
+- Fixed TS build errors by adding missing type definitions for Matrix and Zalo extensions (fake-indexeddb, music-metadata, zca-js).
+- Retains subagent fix from patch2.
+
 
 ## [0.5.66] - 2026-04-04
 
