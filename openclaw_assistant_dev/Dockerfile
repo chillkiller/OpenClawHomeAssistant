@@ -113,8 +113,20 @@ RUN if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then \
 USER root
 
 # Install OpenClaw globally from chillkiller fork with subagent fix
-RUN npm config set fund false && npm config set audit false \
-    && npm install -g github:chillkiller/openclaw#v2026.4.8-patch1 --ignore-scripts
+# Build from source because fork is not published to npm
+RUN npm config set fund false \
+    && npm config set audit false \
+    && cd /tmp \
+    && curl -fsSL https://github.com/chillkiller/openclaw/archive/refs/tags/2026.4.8.tar.gz -o openclaw.tar.gz \
+    && tar -xzf openclaw.tar.gz \
+    && cd openclaw-* \
+    && npm install \
+    && npm run build \
+    && npm prune --production \
+    && npm pack \
+    && npm install -g openclaw-*.tgz \
+    && cd / \
+    && rm -rf /tmp/openclaw*
 
 # Shell aliases and color options for interactive use
 RUN tee -a /etc/bash.bashrc <<'EOF'
