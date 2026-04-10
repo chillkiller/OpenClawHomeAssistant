@@ -38,15 +38,16 @@ RUN mkdir -p /etc/apt/keyrings \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Homebrew (Linuxbrew)
-RUN apt-get update && apt-get install -y git curl \
-    && /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
-    && echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+RUN useradd -m -s /bin/bash linuxbrew \
+    && echo "linuxbrew ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+    && sudo -u linuxbrew -i /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+    && echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/linuxbrew/.bashrc
 
-# Set Homebrew path
+# Set Homebrew path for root and other users
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
 
-# Install Chromium via Brew
-RUN brew install chromium
+# Install Chromium via Brew (running as linuxbrew user)
+RUN sudo -u linuxbrew -i brew install chromium
 
 # Install OpenClaw v0.6.1
 RUN npm install -g openclaw@latest
