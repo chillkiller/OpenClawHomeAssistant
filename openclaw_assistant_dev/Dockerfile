@@ -17,11 +17,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     python3 \
     python3-pip \
+    python3-full \
     ffmpeg \
     libvips-dev \
     liblapack3 \
     libopenblas-dev \
     libopus-dev \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 22 LTS from NodeSource
@@ -45,9 +57,10 @@ RUN useradd -m -s /bin/bash linuxbrew \
 
 # Set Homebrew path for root and other users
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
+ENV HOMEBREW_BREW_FILE="/home/linuxbrew/.linuxbrew/Homebrew"
 
 # Install Chromium via Brew (running as linuxbrew user)
-RUN sudo -u linuxbrew -i brew install chromium
+RUN sudo -u linuxbrew -i /home/linuxbrew/.linuxbrew/bin/brew install chromium
 
 # Install OpenClaw v0.6.1
 RUN npm install -g openclaw@latest
