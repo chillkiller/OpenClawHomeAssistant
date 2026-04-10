@@ -1,5 +1,5 @@
 name: OpenClaw Assistant Dev (Sovereign)
-version: 0.6.0
+version: "0.6.0"
 slug: openclaw_assistant_dev
 description: Run OpenClaw Assistant Dev (Sovereign Edition) as a Home Assistant add-on.
 url: https://github.com/chillkiller/OpenClawHomeAssistant
