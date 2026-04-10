@@ -313,7 +313,8 @@ To provide the SSH key: place the private key file in the add-on config director
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `clean_session_locks_on_start` | bool | `true` | Remove stale session lock files on startup (safe — only removes locks when gateway isn't running) |
-| `clean_session_locks_on_exit` | bool | `true` | Remove session lock files on clean shutdown || `auto_configure_mcp` | bool | `false` | Auto-register Home Assistant as an MCP server on startup (requires `homeassistant_token`) |
+| `clean_session_locks_on_exit` | bool | `true` | Remove session lock files on clean shutdown |
+| `auto_configure_mcp` | bool | `false` | Auto-register Home Assistant as an MCP server on startup (requires `homeassistant_token`) |
 ---
 
 ## 6. Use Case Guides
