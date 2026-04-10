@@ -1,5 +1,5 @@
 name: OpenClaw Assistant
-version: "2026.3.28-1"
+version: "2026.3.28"
 slug: openclaw_stable
 description: OpenClaw Home Assistant Addon (v2026.3.28 - last version without multi-agent bug)
 url: https://github.com/chillkiller/OpenClawHomeAssistant
