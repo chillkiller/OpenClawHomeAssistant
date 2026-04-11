@@ -394,6 +394,15 @@ if ! flock -n 9; then
   exit 1
 fi
 
+# --- NEW: Port-Occupancy Guard ---
+# If the gateway port is already bound, we should NOT try to start a new one.
+# Instead, we should enter the monitoring loop to track the existing process.
+if [ "$GATEWAY_MODE" != "remote" ] && command -v ss >/dev/null 2>&1 && ss -tlnp 2>/dev/null | grep -q ":${GATEWAY_INTERNAL_PORT} "; then
+  echo "INFO: Gateway port ${GATEWAY_INTERNAL_PORT} is already occupied. Skipping startup and entering monitoring mode."
+  # We skip start_openclaw_runtime and let the while-loop find the PID.
+  start_openclaw_runtime_skipped=true
+fi
+
 # ------------------------------------------------------------------------------
 # Session lock cleanup helpers
 # ------------------------------------------------------------------------------
@@ -912,8 +921,10 @@ find_gateway_daemon_pid() {
   return 1
 }
 
-if ! start_openclaw_runtime; then
-  exit 1
+if [ -z "${start_openclaw_runtime_skipped:-}" ]; then
+  if ! start_openclaw_runtime; then
+    exit 1
+  fi
 fi
 
 start_gw_relay
