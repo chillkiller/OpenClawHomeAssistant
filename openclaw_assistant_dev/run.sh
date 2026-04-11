@@ -50,6 +50,12 @@ GATEWAY_MODE=$(jq -r '.gateway_mode // "local"' "$OPTIONS_FILE")
 GATEWAY_REMOTE_URL=$(jq -r '.gateway_remote_url // empty' "$OPTIONS_FILE")
 GATEWAY_BIND_MODE=$(jq -r '.gateway_bind_mode // "loopback"' "$OPTIONS_FILE")
 GATEWAY_PORT=$(jq -r '.gateway_port // 18789' "$OPTIONS_FILE")
+
+# Port safety: prevent overflow at 65535 (fallback to 65534)
+if [ "$GATEWAY_PORT" -ge 65535 ]; then
+  echo "WARN: gateway_port $GATEWAY_PORT exceeds max, using $((GATEWAY_PORT - 1))"
+  GATEWAY_PORT=$((GATEWAY_PORT - 1))
+fi
 ENABLE_OPENAI_API=$(jq -r '.enable_openai_api // false' "$OPTIONS_FILE")
 GATEWAY_AUTH_MODE=$(jq -r '.gateway_auth_mode // "token"' "$OPTIONS_FILE")
 GATEWAY_TRUSTED_PROXIES=$(jq -r '.gateway_trusted_proxies // empty' "$OPTIONS_FILE")
@@ -143,6 +149,34 @@ if [ "$FORCE_IPV4_DNS" = "true" ] || [ "$FORCE_IPV4_DNS" = "1" ]; then
   echo "INFO: Enabled IPv4-first DNS ordering (NODE_OPTIONS=--dns-result-order=ipv4first)"
 fi
 
+# ------------------------------------------------------------------------------
+# Adaptive RAM detection for Power vs Safe mode
+# ------------------------------------------------------------------------------
+TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+TOTAL_RAM_GB=$((TOTAL_RAM_KB / 1024 / 1024))
+
+RAM_MODE="power"
+if [ "$TOTAL_RAM_GB" -le 8 ]; then
+  RAM_MODE="safe"
+fi
+
+echo "INFO: Detected ${TOTAL_RAM_GB}GB RAM → using ${RAM_MODE} mode"
+
+# Set Node.js memory limit based on available RAM
+# Power mode (>8GB): 6GB heap, Safe mode: 2GB heap
+if [ "$RAM_MODE" = "power" ]; then
+  NODE_HEAP_SIZE=6144
+else
+  NODE_HEAP_SIZE=2048
+fi
+
+if [ -z "${NODE_OPTIONS:-}" ]; then
+  export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_SIZE}"
+else
+  export NODE_OPTIONS="${NODE_OPTIONS} --max-old-space-size=${NODE_HEAP_SIZE}"
+fi
+echo "INFO: Node.js memory limit set (NODE_OPTIONS=--max-old-space-size=${NODE_HEAP_SIZE})"
+
 # HA add-ons mount persistent storage at /config (maps to /addon_configs/<slug> on the host).
 export HOME=/config
 
@@ -153,6 +187,28 @@ export OPENCLAW_WORKSPACE_DIR=/config/clawd
 export XDG_CONFIG_HOME=/config
 
 mkdir -p /config/.openclaw /config/.openclaw/identity /config/clawd /config/keys /config/secrets
+
+# Setup tmpfs mounts for RAM disks based on RAM mode
+# Power mode: 4x 2GB = 8GB total (npm_cache, node_tmp, chromium_cache, logs)
+# Safe mode: 1.4GB total (npm_cache 256MB, node_tmp 384MB, chromium_cache 512MB, logs 256MB)
+if [ "$RAM_MODE" = "power" ]; then
+  TMPFS_SIZES="2G 2G 2G 2G"
+  MOUNT_NAMES="npm_cache node_tmp chromium_cache logs"
+else
+  TMPFS_SIZES="256M 384M 512M 256M"
+  MOUNT_NAMES="npm_cache node_tmp chromium_cache logs"
+fi
+
+idx=0
+for mount in $MOUNT_NAMES; do
+  mount_path="/tmp/openclaw/${mount}"
+  mkdir -p "$mount_path"
+  size=$(echo $TMPFS_SIZES | cut -d' ' -f$((idx + 1)))
+  if ! mountpoint -q "$mount_path" 2>/dev/null; then
+    mount -t tmpfs -o size=${size},noatime,nodev,nosuid,noexec "${mount_path}" "${mount_path}" 2>/dev/null || true
+  fi
+  idx=$((idx + 1))
+done
 
 # ------------------------------------------------------------------------------
 # Sync built-in OpenClaw skills from image to persistent storage
@@ -392,15 +448,6 @@ if ! flock -n 9; then
   echo "ERROR: Another instance appears to be running (could not acquire $STARTUP_LOCK)."
   echo "If this is wrong, check for stuck processes or remove the lock file."
   exit 1
-fi
-
-# --- NEW: Port-Occupancy Guard ---
-# If the gateway port is already bound, we should NOT try to start a new one.
-# Instead, we should enter the monitoring loop to track the existing process.
-if [ "$GATEWAY_MODE" != "remote" ] && command -v ss >/dev/null 2>&1 && ss -tlnp 2>/dev/null | grep -q ":${GATEWAY_INTERNAL_PORT} "; then
-  echo "INFO: Gateway port ${GATEWAY_INTERNAL_PORT} is already occupied. Skipping startup and entering monitoring mode."
-  # We skip start_openclaw_runtime and let the while-loop find the PID.
-  start_openclaw_runtime_skipped=true
 fi
 
 # ------------------------------------------------------------------------------
@@ -921,10 +968,8 @@ find_gateway_daemon_pid() {
   return 1
 }
 
-if [ -z "${start_openclaw_runtime_skipped:-}" ]; then
-  if ! start_openclaw_runtime; then
-    exit 1
-  fi
+if ! start_openclaw_runtime; then
+  exit 1
 fi
 
 start_gw_relay
@@ -1054,12 +1099,37 @@ render_landing startup
 echo "Starting ingress proxy (nginx) on :48099 ..."
 nginx -g 'daemon off;' &
 NGINX_PID=$!
-sleep 1
-if kill -0 "$NGINX_PID" 2>/dev/null; then
+NGINX_PORT=48099
+
+# Port-Guard: 30 retry attempts with 1s pause
+for _n in $(seq 1 30); do
+  if ss -tlnp 2>/dev/null | grep -q ":${NGINX_PORT} "; then
+    break
+  fi
+  if ! kill -0 "$NGINX_PID" 2>/dev/null; then
+    echo "WARN: nginx exited prematurely; ingress UI may be unavailable"
+    break
+  fi
+  sleep 1
+done
+
+# 3s pause after daemon detection
+sleep 3
+
+# 10s final binding check for port 48099
+for _final_check in 1 2 3 4 5 6 7 8 9 10; do
+  if ss -tlnp 2>/dev/null | grep -q ":${NGINX_PORT} "; then
+    break
+  fi
+  sleep 1
+done
+
+# Nginx-Validierung: Verify port 48099 is actually bound
+if ss -tlnp 2>/dev/null | grep -q ":${NGINX_PORT} "; then
   echo "$NGINX_PID" > "$NGINX_PID_FILE"
-  echo "nginx started with PID $NGINX_PID"
+  echo "nginx started with PID $NGINX_PID (port ${NGINX_PORT} bound)"
 else
-  echo "WARN: nginx failed to start (PID $NGINX_PID exited); ingress UI may be unavailable"
+  echo "WARN: nginx failed to bind port ${NGINX_PORT}; ingress UI may be unavailable"
 fi
 
 # =============================================================================
@@ -1151,15 +1221,20 @@ while true; do
   fi
 
   # --- Detect self-restart ---------------------------------------------------
-  # Try up to 10 times (≈ 20 s) using all 3 tiers of find_gateway_daemon_pid.
+  # Try up to 30 times (≈ 60 s) using all 3 tiers of find_gateway_daemon_pid.
   # Tier 3 (/proc scan) usually finds the daemon on the very first attempt
   # because the process exists immediately after fork, even before port bind
-  # or process.title. The retries cover edge cases on extremely slow I/O.
+  # or process.title. Increased retries for slow hardware (eMMC, Pi 3/4).
+  # Additional wait-for-port after daemon detection ensures port is bound
+  # before reporting startup complete to avoid race conditions.
   RESTARTED_PID=""
   if [ "$GATEWAY_MODE" != "remote" ]; then
-    for _attempt in 1 2 3 4 5 6 7 8 9 10; do
+    for _attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
       RESTARTED_PID=$(find_gateway_daemon_pid 2>/dev/null || true)
-      [ -n "$RESTARTED_PID" ] && break
+      [ -n "$RESTARTED_PID" ] && {
+        sleep 3
+        break
+      }
       sleep 2
     done
   else
@@ -1178,16 +1253,24 @@ while true; do
   # Even if all detection methods missed the daemon during the loop above,
   # the port may now be bound (the daemon finished initialising while we slept).
   # Never launch a duplicate if the port is occupied.
-  if [ "$GATEWAY_MODE" != "remote" ] && \
-     ss -tlnp 2>/dev/null | grep -q ":${GATEWAY_INTERNAL_PORT} "; then
-    PORT_PID=$(ss -tlnp 2>/dev/null \
-      | grep ":${GATEWAY_INTERNAL_PORT} " \
-      | sed -n 's/.*pid=\([0-9]*\).*/\1/p' \
-      | head -1 || true)
-    echo "INFO: Gateway port ${GATEWAY_INTERNAL_PORT} occupied by PID ${PORT_PID:-unknown}; monitoring."
-    GW_PID="${PORT_PID:-$GW_PID}"
-    GW_IS_CHILD=false
-    continue
+  # Wait up to 10s for port to actually bind on slow hardware (eMMC).
+  if [ "$GATEWAY_MODE" != "remote" ]; then
+    for _port_wait in 1 2 3 4 5 6 7 8 9 10; do
+      if ss -tlnp 2>/dev/null | grep -q ":${GATEWAY_INTERNAL_PORT} "; then
+        break
+      fi
+      sleep 1
+    done
+    if ss -tlnp 2>/dev/null | grep -q ":${GATEWAY_INTERNAL_PORT} "; then
+      PORT_PID=$(ss -tlnp 2>/dev/null \
+        | grep ":${GATEWAY_INTERNAL_PORT} " \
+        | sed -n 's/.*pid=\([0-9]*\).*/\1/p' \
+        | head -1 || true)
+      echo "INFO: Gateway port ${GATEWAY_INTERNAL_PORT} occupied by PID ${PORT_PID:-unknown}; monitoring."
+      GW_PID="${PORT_PID:-$GW_PID}"
+      GW_IS_CHILD=false
+      continue
+    fi
   fi
 
   echo "WARN: OpenClaw runtime exited with code ${GW_EXIT_CODE}. Restarting in 2s..."

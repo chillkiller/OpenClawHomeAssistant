@@ -1,6 +1,8 @@
-# Dockerfile for OpenClaw Dev-Addon v0.6.5 (Trixie)
-
+# Dockerfile for OpenClaw Dev-Addon v0.6.5
 FROM debian:trixie-slim
+
+ENV CHROMIUM_CACHE=/tmp/openclaw/chromium_cache
+ENV CHROME_FLAGS="--disk-cache-dir=/tmp/openclaw/chromium_cache --disk-cache-size=524288000"
 
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -83,8 +85,8 @@ RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch
     && curl -fsSL "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.${ARCH}" -o /usr/local/bin/ttyd \
     && chmod +x /usr/local/bin/ttyd
 
-# Install OpenClaw v0.6.5
-RUN npm install -g openclaw@latest \
+# Install OpenClaw v0.6.5 (pinned version)
+RUN npm install -g openclaw@2026.4.10 \
     && npm install -g pnpm
 
 # Fix safe.directory
@@ -99,5 +101,8 @@ COPY nginx.conf.tpl /etc/nginx/nginx.conf.tpl
 COPY landing.html.tpl /etc/nginx/landing.html.tpl
 RUN chmod +x /run.sh /oc_config_helper.py /render_nginx.py /usr/local/bin/oc-cleanup \
     && mkdir -p /run/nginx
+
+RUN mkdir -p /config/.local/lib/python3.11/site-packages
+ENV PYTHONPATH=/config/.local/lib/python3.11/site-packages:
 
 CMD [ "/run.sh" ]

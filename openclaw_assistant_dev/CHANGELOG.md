@@ -2,4 +2,3 @@
 - Fix Dockerfile: Changed CMD to /run.sh to resolve systemd startup loop.
 - Fix Dockerfile: Added missing essential packages (nginx, jq, openssl, pnpm, ttyd) and infrastructure files (COPY/chmod).
 - Fix run.sh: Validated mDNS variable logic.
-- Infrastructure: Updated ACP permissionMode to approve-all for background tasks.
