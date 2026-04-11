@@ -2,7 +2,7 @@
 
 All notable changes to the OpenClaw Assistant Home Assistant Add-on will be documented in this file.
 
-## [0.6.6] - 2026-04-11
+## [0.6.0.6] - 2026-04-11
 
 ### Fixed
 - Fixed Docker build failure where Homebrew attempted to install a macOS Cask instead of a Linux formula for Chromium.
