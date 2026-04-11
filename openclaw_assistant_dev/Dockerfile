@@ -34,6 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrandr2 \
     libgbm1 \
     libasound2 \
+    nginx \
+    jq \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 22 LTS from NodeSource
@@ -74,15 +77,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     && rm -rf /var/lib/apt/lists/*
 
+# Install ttyd (web terminal) binary
+ARG TARGETARCH
+RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch64|;s|arm/v7|armhf|;s|armv7|armhf|;s|amd64|x86_64|') \
+    && curl -fsSL "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.${ARCH}" -o /usr/local/bin/ttyd \
+    && chmod +x /usr/local/bin/ttyd
+
 # Install OpenClaw v0.6.5
-RUN npm install -g openclaw@latest
+RUN npm install -g openclaw@latest \
+    && npm install -g pnpm
 
 # Fix safe.directory
 RUN git config --global safe.directory /home/linuxbrew/.linuxbrew/Homebrew
 
-# Setup Workspace
-WORKDIR /config/clawd
-COPY . .
+COPY run.sh /run.sh
+COPY oc_config_helper.py /oc_config_helper.py
+COPY render_nginx.py /render_nginx.py
+COPY oc-cleanup.sh /usr/local/bin/oc-cleanup
+COPY openclaw-proxy-shim.cjs /usr/local/lib/openclaw-proxy-shim.cjs
+COPY nginx.conf.tpl /etc/nginx/nginx.conf.tpl
+COPY landing.html.tpl /etc/nginx/landing.html.tpl
+RUN chmod +x /run.sh /oc_config_helper.py /render_nginx.py /usr/local/bin/oc-cleanup \
+    && mkdir -p /run/nginx
 
-# Default command
-CMD ["openclaw", "gateway", "start"]
+CMD [ "/run.sh" ]
