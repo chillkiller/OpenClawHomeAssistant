@@ -298,58 +298,64 @@ def set_mdns_settings(
     """
     Configure mDNS/Bonjour discovery settings for the gateway.
 
-    CRITICAL FIX: The gateway binds to loopback (127.0.0.1:18790) but mDNS
-    must advertise the PUBLIC HTTPS proxy port (18789), NOT the internal
-    gateway port. Clients on the LAN use mDNS to find the addon's IP:port
-    and then connect via the nginx HTTPS proxy.
+    DEPRECATED: OpenClaw 2026.4.10+ no longer uses discovery.mDNS in config.
+    The discovery configuration is now handled internally by the gateway.
+    This function is kept for backward compatibility but does NOT write
+    to the config anymore to avoid "Unrecognized key: mDNS" errors.
+
+    For mDNS to work, ensure the gateway is running with proper network
+    binding (lan or tailnet mode for LAN discovery).
 
     Args:
-        mode: mDNS mode - "off", "minimal", or "full"
-        service_port: The port to advertise in mDNS (should be the PUBLIC
-                     HTTPS proxy port, e.g. 18789, NOT the internal 18790)
-        host_name: Optional hostname (e.g. "homeassistant.local").
-                   If empty, uses the container's existing hostname.
-        interface_name: Optional network interface (e.g. "eth0").
-                        If empty, auto-detected.
+        mode: mDNS mode - "off", "minimal", or "full" ( informational only )
+        service_port: The port to advertise (informational only)
+        host_name: Optional hostname (informational only)
+        interface_name: Optional network interface (informational only)
+    """
+    # OpenClaw 2026.4.10+ does not support discovery.mDNS in config.
+    # Writing it causes "Invalid config: discovery: Unrecognized key: mDNS"
+    # Instead, we log the requested settings but DO NOT write to config.
+    # The gateway handles mDNS discovery internally based on gateway.bind mode.
+
+    if mode != "off":
+        print(f"INFO: mDNS requested (mode={mode}, port={service_port})")
+        print(f"INFO: mDNS is now handled internally by the gateway")
+        print(f"INFO: Ensure gateway.bind is 'lan' or 'tailnet' for LAN discovery")
+    else:
+        print(f"INFO: mDNS disabled (mode=off)")
+
+    # DO NOT write to config - discovery.mDNS is deprecated in OpenClaw 2026.4.10
+    return True
+
+
+def cleanup_stale_config_keys():
+    """
+    Remove stale/invalid config keys that are no longer supported by OpenClaw.
+    This prevents "Unrecognized key" errors from openclaw doctor.
     """
     cfg = read_config()
     if cfg is None:
-        cfg = {}
+        return True
 
-    if "discovery" not in cfg:
-        cfg["discovery"] = {}
-    if "mDNS" not in cfg["discovery"]:
-        cfg["discovery"]["mDNS"] = {}
-
-    mdns = cfg["discovery"]["mDNS"]
     changes = []
 
-    if mdns.get("mode") != mode:
-        changes.append(f"mode: {mdns.get('mode')} -> {mode}")
-        mdns["mode"] = mode
-
-    if mdns.get("servicePort") != service_port:
-        changes.append(f"servicePort: {mdns.get('servicePort')} -> {service_port}")
-        mdns["servicePort"] = service_port
-
-    if host_name and mdns.get("hostName") != host_name:
-        changes.append(f"hostName: {mdns.get('hostName')} -> {host_name}")
-        mdns["hostName"] = host_name
-
-    if interface_name and mdns.get("interfaceName") != interface_name:
-        changes.append(
-            f"interfaceName: {mdns.get('interfaceName')} -> {interface_name}"
-        )
-        mdns["interfaceName"] = interface_name
+    # Remove deprecated discovery.mDNS key (causes "Unrecognized key: mDNS")
+    if "discovery" in cfg:
+        if "mDNS" in cfg["discovery"]:
+            del cfg["discovery"]["mDNS"]
+            changes.append("removed deprecated discovery.mDNS")
+        # Remove empty discovery section
+        if not cfg["discovery"]:
+            del cfg["discovery"]
+            changes.append("removed empty discovery section")
 
     if not changes:
-        print(f"INFO: mDNS settings already correct: mode={mode}, port={service_port}")
         return True
 
     if write_config(cfg):
-        print(f"INFO: Updated mDNS settings: {', '.join(changes)}")
+        print(f"INFO: Cleaned stale config keys: {', '.join(changes)}")
         return True
-    print("ERROR: Failed to write config")
+    print("ERROR: Failed to clean stale config keys")
     return False
 
 
@@ -422,6 +428,10 @@ def main():
         host_name = sys.argv[4] if len(sys.argv) >= 5 else ""
         interface_name = sys.argv[5] if len(sys.argv) >= 6 else ""
         success = set_mdns_settings(mode, service_port, host_name, interface_name)
+        sys.exit(0 if success else 1)
+
+    elif cmd == "cleanup-stale-config":
+        success = cleanup_stale_config_keys()
         sys.exit(0 if success else 1)
 
     elif cmd == "set":
