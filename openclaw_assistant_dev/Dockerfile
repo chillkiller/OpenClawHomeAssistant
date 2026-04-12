@@ -91,16 +91,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
-# Zone 3: Modern Toolchains (Bun, uv) - not available in Debian
+# Zone 3: Modern Toolchains (Bun, uv) - Direct Binary Download (Sledgehammer)
 # =============================================================================
-# Bun (QMD Memory Engine)
-RUN curl -fsSL https://bun.sh/install | bash && \
-    mv /root/.bun/bin/bun /usr/local/bin/ && \
-    rm -rf /root/.bun
+ARG TARGETARCH
+RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch64|;s|amd64|x64|') \
+    && echo "Installing Bun for architecture: ${ARCH}" \
+    && curl -fsSL "https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${ARCH}.zip" -o /tmp/bun.zip \
+    && unzip -oqd /tmp /tmp/bun.zip \
+    && mv /tmp/bun-linux-${ARCH}/bun /usr/local/bin/bun \
+    && chmod +x /usr/local/bin/bun \
+    && rm -rf /tmp/bun.zip /tmp/bun-linux-${ARCH} \
+    && bun --version
 
 # uv (Fast Python Packages)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    mv /root/.local/bin/uv /usr/local/bin/
+RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch64|;s|amd64|x86_64|') \
+    && echo "Installing uv for architecture: ${ARCH}" \
+    && curl -fsSL "https://github.com/astral-sh/uv/releases/latest/download/uv-linux-${ARCH}.tar.gz" -o /tmp/uv.tar.gz \
+    && tar -xzf /tmp/uv.tar.gz -C /tmp \
+    && mv /tmp/uv-linux-${ARCH}/uv /usr/local/bin/uv \
+    && chmod +x /usr/local/bin/uv \
+    && rm -rf /tmp/uv.tar.gz /tmp/uv-linux-${ARCH} \
+    && uv --version
 
 # =============================================================================
 # Install Node.js 22 LTS from NodeSource
