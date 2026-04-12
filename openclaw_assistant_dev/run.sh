@@ -186,6 +186,70 @@ export OPENCLAW_CONFIG_DIR=/config/.openclaw
 export OPENCLAW_WORKSPACE_DIR=/config/clawd
 export XDG_CONFIG_HOME=/config
 
+# =============================================================================
+# NODE_COMPILE_CACHE: Enable V8 compile cache for faster CLI startups
+# =============================================================================
+export NODE_COMPILE_CACHE=/config/.node-compile-cache
+mkdir -p "$NODE_COMPILE_CACHE"
+echo "INFO: NODE_COMPILE_CACHE enabled at $NODE_COMPILE_CACHE"
+
+# =============================================================================
+# RESOURCE LIMITS: Prevent virtual memory exhaustion
+# =============================================================================
+ulimit -v 8388608
+echo "INFO: Virtual memory limit set to 8GB (ulimit -v 8388608)"
+
+# =============================================================================
+# HOME Consistency: Sync /root to /config to avoid fragmentation
+# =============================================================================
+# Some tools still write to /root, causing inconsistency. Symlink key directories.
+
+# Backup /root data if present (with safety checks)
+if [ -n "$(ls -A /root 2>/dev/null)" ]; then
+    echo "INFO: /root has data, creating backup..."
+    
+    # Disk space check (require at least 500MB free)
+    FREE_SPACE=$(df -BM /config 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'M')
+    if [ "${FREE_SPACE:-0}" -lt 500 ]; then
+        echo "WARNING: Low disk space (${FREE_SPACE}M), skipping /root backup"
+    else
+        # Permission check
+        if [ -w /config ]; then
+            tar -czf "/config/backup_root_$(date +%Y%m%d).tar.gz" /root/ 2>/dev/null && \
+                echo "INFO: /root backup created" || \
+                echo "WARNING: Backup failed, continuing with sync"
+        else
+            echo "WARNING: /config not writable, skipping backup"
+        fi
+    fi
+else
+    echo "INFO: /root is empty, no backup needed"
+fi
+
+for dir in .ssh .npm .cache .local; do
+  if [ -d "/root/$dir" ] && [ ! -L "/root/$dir" ]; then
+    if [ -d "/config/$dir" ]; then
+      # Merge content: copy new files from /root to /config
+      cp -rn "/root/$dir/"* "/config/$dir/" 2>/dev/null || true
+    else
+      mkdir -p "/config/$dir"
+      cp -rn "/root/$dir/"* "/config/$dir/" 2>/dev/null || true
+    fi
+    rm -rf "/root/$dir"
+    ln -sf "/config/$dir" "/root/$dir"
+  elif [ -L "/root/$dir" ]; then
+    # Already linked
+    true
+  elif [ ! -d "/config/$dir" ]; then
+    mkdir -p "/config/$dir"
+  fi
+done
+
+# Ensure /root/.bashrc sources /config/.bashrc if it exists
+if [ -f "/config/.bashrc" ] && [ ! -f "/root/.bashrc" ]; then
+  echo "source /config/.bashrc" > /root/.bashrc
+fi
+
 mkdir -p /config/.openclaw /config/.openclaw/identity /config/clawd /config/keys /config/secrets
 
 # Setup tmpfs mounts for RAM disks based on RAM mode
@@ -451,6 +515,18 @@ if ! flock -n 9; then
 fi
 
 # ------------------------------------------------------------------------------
+# ZOMBIE CLEANUP: Remove any zombie processes from previous runs
+# ------------------------------------------------------------------------------
+ZOMBIE_PIDS=$(ps aux | grep -E '\[sh\] <defunct>' | awk '{print $2}')
+if [ -n "$ZOMBIE_PIDS" ]; then
+  echo "INFO: Cleaning up $(($(echo "$ZOMBIE_PIDS" | wc -w))) zombie process(es) from previous run"
+  for zp in $ZOMBIE_PIDS; do
+    # Try to reap with wait (may fail if already orphaned)
+    wait "$zp" 2>/dev/null || true
+  done
+fi
+
+# ------------------------------------------------------------------------------
 # Session lock cleanup helpers
 # ------------------------------------------------------------------------------
 
@@ -498,6 +574,22 @@ if [ "$CLEAN_LOCKS_ON_START" = "true" ]; then
   cleanup_session_locks
 else
   echo "INFO: clean_session_locks_on_start=false; skipping session lock cleanup."
+fi
+
+# =============================================================================
+# ZOMBIE PREVENTION: SIGCHLD handler for proper child process reaping
+# =============================================================================
+# This prevents zombie processes when child processes (like shell commands
+# spawned by the gateway) exit. The handler waits for any dead children.
+reap_zombies() {
+  while wait -n 2>/dev/null; do
+    : # Wait for any child process to exit, preventing zombies
+  done
+}
+# Start background reaper (only works in bash, not sh)
+if [ -n "${BASH_VERSION:-}" ]; then
+  trap reap_zombies SIGCHLD
+  echo "INFO: SIGCHLD handler enabled for zombie prevention"
 fi
 
 # ------------------------------------------------------------------------------
@@ -577,6 +669,14 @@ fi
 # Bootstrap minimal OpenClaw config ONLY if missing.
 # We do not overwrite or patch existing configs; onboarding owns everything else.
 OPENCLAW_CONFIG_PATH="/config/.openclaw/openclaw.json"
+
+# Clean up stale/invalid config keys on startup (e.g. deprecated discovery.mDNS)
+if [ -f "$OPENCLAW_CONFIG_PATH" ]; then
+  if python3 /oc_config_helper.py cleanup-stale-config 2>&1; then
+    echo "INFO: Config cleanup completed"
+  fi
+fi
+
 if [ ! -f "$OPENCLAW_CONFIG_PATH" ]; then
   echo "INFO: OpenClaw config missing; bootstrapping minimal config at $OPENCLAW_CONFIG_PATH"
   python3 - <<'PY'
