@@ -1,4 +1,4 @@
-# Dockerfile for OpenClaw Dev-Addon v0.6.1.4
+# Dockerfile for OpenClaw Dev-Addon v0.6.1.5
 # Multi-stage build for disk space optimization
 FROM debian:trixie-slim AS builder
 
@@ -54,6 +54,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     liblapack3 \
     libopenblas-dev \
     libopus-dev \
+    # Build tools (needed for node-gyp fallback compile)
+    build-essential \
     libnss3 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
