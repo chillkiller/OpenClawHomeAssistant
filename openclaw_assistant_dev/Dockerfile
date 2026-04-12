@@ -1,4 +1,4 @@
-# Dockerfile for OpenClaw Dev-Addon v0.6.6
+# Dockerfile for OpenClaw Dev-Addon v0.6.1.4
 # Multi-stage build for disk space optimization
 FROM debian:trixie-slim AS builder
 
@@ -106,11 +106,11 @@ RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch
 # uv (Fast Python Packages)
 RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch64|;s|amd64|x86_64|') \
     && echo "Installing uv for architecture: ${ARCH}" \
-    && curl -fsSL "https://github.com/astral-sh/uv/releases/latest/download/uv-linux-${ARCH}.tar.gz" -o /tmp/uv.tar.gz \
+    && curl -fsSL "https://github.com/astral-sh/uv/releases/latest/download/uv-${ARCH}-unknown-linux-gnu.tar.gz" -o /tmp/uv.tar.gz \
     && tar -xzf /tmp/uv.tar.gz -C /tmp \
-    && mv /tmp/uv-linux-${ARCH}/uv /usr/local/bin/uv \
+    && mv /tmp/uv-${ARCH}-unknown-linux-gnu/uv /usr/local/bin/uv \
     && chmod +x /usr/local/bin/uv \
-    && rm -rf /tmp/uv.tar.gz /tmp/uv-linux-${ARCH} \
+    && rm -rf /tmp/uv.tar.gz /tmp/uv-${ARCH}-unknown-linux-gnu \
     && uv --version
 
 # =============================================================================
