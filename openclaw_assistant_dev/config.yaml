@@ -1,7 +1,7 @@
-# OpenClaw Dev-Addon v0.6.1.2 Configuration
+# OpenClaw Dev-Addon v0.6.1.3 Configuration
 
 name: OpenClaw Assistant (Dev)
-version: "0.6.1.2"
+version: "0.6.1.3"
 slug: openclaw_assistant_dev
 description: OpenClaw Home Assistant Addon (Development Branch - Trixie)
 url: https://github.com/chillkiller/OpenClawHomeAssistant
