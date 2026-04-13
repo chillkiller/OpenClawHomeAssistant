@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set -x
+
+# BRUTE-FORCE DEBUG: Capture ALL output (stdout+stderr) to persistent log from the very start
+mkdir -p /config/clawd/logs
+exec > >(tee -a /config/clawd/logs/run_full_trace.log) 2>&1
 
 # Ensure Homebrew and brew-installed binaries are in PATH
 # This is needed for OpenClaw skills that depend on CLI tools (gemini, aider, etc.)
@@ -228,6 +233,7 @@ else
     echo "INFO: /root is empty, no backup needed"
 fi
 
+echo "DEBUG: ==== START: /root -> /config SYNC SECTION ===="
 for dir in .ssh .npm .cache .local; do
   if [ -d "/root/$dir" ] && [ ! -L "/root/$dir" ]; then
     if [ -d "/config/$dir" ]; then
@@ -256,6 +262,7 @@ mkdir -p /config/.openclaw /config/.openclaw/identity /config/clawd /config/keys
 
 echo "DEBUG: Reached after mkdir -p dirs section"
 
+echo "DEBUG: ==== START: TMPFS MOUNT SECTION ===="
 # Setup tmpfs mounts for RAM disks based on RAM mode
 # Power mode (>8GB): 512M + 256M + 256M + 128M = 1.1GB total (npm_cache, node_tmp, chromium_cache, logs)
 # Safe mode (<=8GB): 256M + 128M + 128M + 64M = 576MB total (npm_cache, node_tmp, chromium_cache, logs)
@@ -279,6 +286,7 @@ for mount in $MOUNT_NAMES; do
   idx=$((idx + 1))
 done
 
+echo "DEBUG: ==== START: OPENCLAW SKILLS SYNC SECTION ===="
 # ------------------------------------------------------------------------------
 # Sync built-in OpenClaw skills from image to persistent storage
 # On each startup, copy new/updated built-in skills so they survive rebuilds.
@@ -499,6 +507,7 @@ else
   echo "INFO: Homebrew not available (install may have failed during image build)"
 fi
 
+echo "DEBUG: ==== START: BACK-COMPAT SYMLINK SECTION ===="
 # Back-compat: some docs/scripts assume /data; point it at /config.
 if [ ! -e /data ]; then
   ln -s /config /data || true
@@ -506,6 +515,7 @@ fi
 
 echo "DEBUG: Reached after back-compat symlink section"
 
+echo "DEBUG: ==== START: AGENTS DIR SECTION ===="
 # Ensure the agents base directory exists so cleanup scans work even before first run.
 # Do NOT pre-create agent-specific directories; OpenClaw creates them as needed.
 mkdir -p /config/.openclaw/agents || true
