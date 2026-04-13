@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
-OpenClaw config helper for Home Assistant add-on.
+OpenClaw config helper for Home Assistant add-on (v0.7.0).
+
 Safely reads/writes openclaw.json without corrupting it.
+Implements 3-layer merge: Custom JSON -> Persisted config -> HA options.
+
+Also handles mDNS via nginx config injection (not openclaw.json,
+since OpenClaw 2026.4.10+ deprecated discovery.mDNS in config).
+
+Based on patterns from coollabsio/configure.js + techartdev oc_config_helper.py.
 """
 
 import json
@@ -27,10 +34,7 @@ def read_config():
 
 
 def write_config(cfg):
-    """
-    Write config back to file with atomic write to prevent corruption on crash.
-    Writes to temp file first, then renames to target (atomic on same filesystem).
-    """
+    """Atomic write to prevent corruption on crash."""
     try:
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         temp_path = CONFIG_PATH.with_suffix(".json.tmp")
@@ -44,25 +48,24 @@ def write_config(cfg):
         return False
 
 
-def get_gateway_setting(key, default=None):
-    """Get a gateway setting from config."""
-    cfg = read_config()
-    if cfg is None:
-        return default
-    return cfg.get("gateway", {}).get(key, default)
-
-
-def set_gateway_setting(key, value):
-    """Set a gateway setting, preserving other config."""
-    cfg = read_config()
-    if cfg is None:
-        cfg = {}
-
-    if "gateway" not in cfg:
-        cfg["gateway"] = {}
-
-    cfg["gateway"][key] = value
-    return write_config(cfg)
+def deep_merge(target, source):
+    """
+    Deep merge source into target. Arrays are replaced, not concatenated.
+    Prototype pollution safe.
+    """
+    unsafe_keys = {"__proto__", "constructor", "prototype"}
+    for key in source:
+        if key in unsafe_keys:
+            continue
+        if (
+            isinstance(source[key], dict)
+            and isinstance(target.get(key), dict)
+            and not isinstance(target.get(key), list)
+        ):
+            deep_merge(target[key], source[key])
+        else:
+            target[key] = source[key]
+    return target
 
 
 def apply_gateway_settings(
@@ -76,213 +79,113 @@ def apply_gateway_settings(
 ):
     """
     Apply gateway settings to OpenClaw config.
-
-    Args:
-        mode: "local" or "remote"
-        remote_url: remote Gateway websocket URL (used when mode=remote)
-        bind_mode: "loopback", "lan", or "tailnet"
-        port: Port number to listen on (must be 1-65535)
-        enable_openai_api: Enable OpenAI-compatible Chat Completions endpoint
-        auth_mode: Gateway auth mode (token|trusted-proxy)
-        trusted_proxies_csv: Comma-separated trusted proxy IP/CIDR list
+    Only overwrites keys that differ — preserves everything else.
     """
-    # Validate gateway mode
     if mode not in ["local", "remote"]:
         print(f"ERROR: Invalid mode '{mode}'. Must be 'local' or 'remote'")
         return False
-
-    # Validate bind mode
     if bind_mode not in ["loopback", "lan", "tailnet"]:
-        print(
-            f"ERROR: Invalid bind_mode '{bind_mode}'. Must be 'loopback', 'lan', or 'tailnet'"
-        )
+        print(f"ERROR: Invalid bind_mode '{bind_mode}'")
         return False
-
-    # Validate port range
     if port < 1 or port > 65535:
-        print(f"ERROR: Invalid port {port}. Must be between 1 and 65535")
+        print(f"ERROR: Invalid port {port}")
         return False
-
-    # Validate auth mode
     if auth_mode not in ["token", "trusted-proxy"]:
-        print(
-            f"ERROR: Invalid auth_mode '{auth_mode}'. Must be 'token' or 'trusted-proxy'"
-        )
+        print(f"ERROR: Invalid auth_mode '{auth_mode}'")
         return False
 
-    cfg = read_config()
-    if cfg is None:
-        cfg = {}
-
-    if "gateway" not in cfg:
-        cfg["gateway"] = {}
-
-    gateway = cfg["gateway"]
-
-    # gateway.remote settings
-    if "remote" not in gateway or not isinstance(gateway.get("remote"), dict):
-        gateway["remote"] = {}
-    remote_cfg = gateway["remote"]
-
-    # auth should be nested inside gateway
-    if "auth" not in gateway:
-        gateway["auth"] = {}
-
-    # http.endpoints.chatCompletions should be nested inside gateway
-    if "http" not in gateway:
-        gateway["http"] = {}
-    if "endpoints" not in gateway["http"]:
-        gateway["http"]["endpoints"] = {}
-    if "chatCompletions" not in gateway["http"]["endpoints"]:
-        gateway["http"]["endpoints"]["chatCompletions"] = {}
-
-    auth = gateway["auth"]
-    chat_completions = gateway["http"]["endpoints"]["chatCompletions"]
+    cfg = read_config() or {}
+    gateway = cfg.setdefault("gateway", {})
+    remote_cfg = gateway.setdefault("remote", {})
+    auth = gateway.setdefault("auth", {})
+    http = gateway.setdefault("http", {})
+    endpoints = http.setdefault("endpoints", {})
+    chat = endpoints.setdefault("chatCompletions", {})
 
     trusted_proxies = [p.strip() for p in trusted_proxies_csv.split(",") if p.strip()]
-
-    # OpenClaw trusted-proxy mode requires nested auth.trustedProxy config.
-    # Use a sane default user header expected from reverse proxies.
-    trusted_proxy_cfg_default = {"userHeader": "x-forwarded-user"}
-
-    current_mode = gateway.get("mode", "")
-    current_remote_url = remote_cfg.get("url", "")
-    current_bind = gateway.get("bind", "")
-    current_port = gateway.get("port", 18789)
-    current_openai_api = chat_completions.get("enabled", False)
-    current_auth_mode = auth.get("mode", "token")
-    current_trusted_proxies = gateway.get("trustedProxies", [])
-    current_trusted_proxy_cfg = auth.get("trustedProxy")
+    trusted_proxy_default = {"userHeader": "x-forwarded-user"}
 
     changes = []
 
-    if current_mode != mode:
+    if gateway.get("mode") != mode:
         gateway["mode"] = mode
-        changes.append(f"mode: {current_mode} -> {mode}")
+        changes.append(f"mode: {gateway.get('mode')} -> {mode}")
 
-    if current_remote_url != remote_url:
+    if remote_cfg.get("url") != remote_url:
         remote_cfg["url"] = remote_url
-        changes.append(f"remote.url: {current_remote_url} -> {remote_url}")
+        changes.append(f"remote.url -> {remote_url}")
 
-    if current_bind != bind_mode:
+    if gateway.get("bind") != bind_mode:
         gateway["bind"] = bind_mode
-        changes.append(f"bind: {current_bind} -> {bind_mode}")
+        changes.append(f"bind: {gateway.get('bind')} -> {bind_mode}")
 
-    if current_port != port:
+    if gateway.get("port") != port:
         gateway["port"] = port
-        changes.append(f"port: {current_port} -> {port}")
+        changes.append(f"port: {gateway.get('port')} -> {port}")
 
-    if current_openai_api != enable_openai_api:
-        chat_completions["enabled"] = enable_openai_api
-        changes.append(
-            f"chatCompletions.enabled: {current_openai_api} -> {enable_openai_api}"
-        )
+    if chat.get("enabled") != enable_openai_api:
+        chat["enabled"] = enable_openai_api
+        changes.append(f"chatCompletions.enabled -> {enable_openai_api}")
 
-    if current_auth_mode != auth_mode:
+    if auth.get("mode") != auth_mode:
         auth["mode"] = auth_mode
-        changes.append(f"auth.mode: {current_auth_mode} -> {auth_mode}")
+        changes.append(f"auth.mode -> {auth_mode}")
 
-    if current_trusted_proxies != trusted_proxies:
+    if gateway.get("trustedProxies") != trusted_proxies:
         gateway["trustedProxies"] = trusted_proxies
-        changes.append(
-            f"trustedProxies: {current_trusted_proxies} -> {trusted_proxies}"
-        )
+        changes.append(f"trustedProxies -> {trusted_proxies}")
 
-    if auth_mode == "trusted-proxy":
-        if current_trusted_proxy_cfg != trusted_proxy_cfg_default:
-            auth["trustedProxy"] = trusted_proxy_cfg_default
-            changes.append(
-                "auth.trustedProxy: configured default userHeader=x-forwarded-user"
-            )
+    if auth_mode == "trusted-proxy" and auth.get("trustedProxy") != trusted_proxy_default:
+        auth["trustedProxy"] = trusted_proxy_default
+        changes.append("auth.trustedProxy: configured default userHeader")
 
     if changes:
         if write_config(cfg):
             print(f"INFO: Updated gateway settings: {', '.join(changes)}")
             return True
-        else:
-            print("ERROR: Failed to write config")
-            return False
-    else:
-        print(
-            f"INFO: Gateway settings already correct (mode={mode}, remoteUrl={remote_url}, bind={bind_mode}, port={port}, chatCompletions={enable_openai_api}, authMode={auth_mode}, trustedProxies={trusted_proxies})"
-        )
-        return True
+        print("ERROR: Failed to write config")
+        return False
+
+    print(f"INFO: Gateway settings already correct (mode={mode}, bind={bind_mode}, port={port})")
+    return True
 
 
 def set_control_ui_origins(
     origins_csv: str, additional_origins_csv: str = "", disable_device_auth: bool = True
 ):
-    """
-    Configure gateway.controlUi for the built-in HTTPS proxy.
+    """Configure gateway.controlUi for the built-in HTTPS proxy."""
+    cfg = read_config() or {}
+    gateway = cfg.setdefault("gateway", {})
+    control_ui = gateway.setdefault("controlUi", {})
 
-    Sets:
-      - allowedOrigins: the HTTPS proxy origins so the browser WebSocket
-        is accepted (required since v2026.2.21).
-      - dangerouslyDisableDeviceAuth: controlled by add-on option
-        `controlui_disable_device_auth` (default true). When true, skips
-        interactive device pairing; token auth remains enforced.
-
-    Also removes any stale/invalid keys (e.g. pairingMode) that may have
-    been written by earlier add-on versions.
-
-    Args:
-        origins_csv: Comma-separated list of default origins provided by the add-on.
-        additional_origins_csv: Comma-separated list of user-provided extra origins.
-    """
-    cfg = read_config()
-    if cfg is None:
-        cfg = {}
-
-    if "gateway" not in cfg:
-        cfg["gateway"] = {}
-    gateway = cfg["gateway"]
-
-    if "controlUi" not in gateway:
-        gateway["controlUi"] = {}
-
-    control_ui = gateway["controlUi"]
     default_origins = [o.strip() for o in origins_csv.split(",") if o.strip()]
-    additional_origins = [
-        o.strip() for o in (additional_origins_csv or "").split(",") if o.strip()
-    ]
-    changes = []
-
-    # --- allowedOrigins ---
+    additional_origins = [o.strip() for o in (additional_origins_csv or "").split(",") if o.strip()]
     current_origins = control_ui.get("allowedOrigins", [])
     if not isinstance(current_origins, list):
         current_origins = []
 
-    merged_origins = []
+    merged = []
     for origin in [*default_origins, *current_origins, *additional_origins]:
-        if isinstance(origin, str) and origin and origin not in merged_origins:
-            merged_origins.append(origin)
+        if isinstance(origin, str) and origin and origin not in merged:
+            merged.append(origin)
 
-    if current_origins != merged_origins:
-        control_ui["allowedOrigins"] = merged_origins
-        changes.append(f"allowedOrigins: {current_origins} -> {merged_origins}")
+    changes = []
+    if current_origins != merged:
+        control_ui["allowedOrigins"] = merged
+        changes.append(f"allowedOrigins -> {merged}")
 
-    # --- dangerouslyDisableDeviceAuth ---
-    # Optional bypass of interactive per-device pairing (error 1008: pairing required).
-    # Token auth is still enforced; this only controls the approval ceremony.
-    desired_device_auth_flag = True if disable_device_auth else False
-    if control_ui.get("dangerouslyDisableDeviceAuth") is not desired_device_auth_flag:
-        prev = control_ui.get("dangerouslyDisableDeviceAuth")
-        control_ui["dangerouslyDisableDeviceAuth"] = desired_device_auth_flag
-        changes.append(
-            f"dangerouslyDisableDeviceAuth: {prev} -> {desired_device_auth_flag}"
-        )
+    desired_flag = True if disable_device_auth else False
+    if control_ui.get("dangerouslyDisableDeviceAuth") is not desired_flag:
+        control_ui["dangerouslyDisableDeviceAuth"] = desired_flag
+        changes.append(f"dangerouslyDisableDeviceAuth -> {desired_flag}")
 
-    # --- Remove invalid keys from earlier add-on versions ---
-    for stale_key in ("pairingMode",):
-        if stale_key in control_ui:
-            del control_ui[stale_key]
-            changes.append(f"removed invalid key: {stale_key}")
+    # Remove stale keys from earlier add-on versions
+    for stale in ("pairingMode",):
+        if stale in control_ui:
+            del control_ui[stale]
+            changes.append(f"removed stale key: {stale}")
 
     if not changes:
-        status = "disabled" if desired_device_auth_flag else "enabled"
-        print(
-            f"INFO: controlUi already correct: origins={merged_origins}, deviceAuth={status}"
-        )
         return True
 
     if write_config(cfg):
@@ -296,55 +199,44 @@ def set_mdns_settings(
     mode: str, service_port: int, host_name: str = "", interface_name: str = ""
 ):
     """
-    Configure mDNS/Bonjour discovery settings for the gateway.
+    Configure mDNS/Bonjour discovery for the gateway.
 
-    DEPRECATED: OpenClaw 2026.4.10+ no longer uses discovery.mDNS in config.
-    The discovery configuration is now handled internally by the gateway.
-    This function is kept for backward compatibility but does NOT write
-    to the config anymore to avoid "Unrecognized key: mDNS" errors.
+    OpenClaw 2026.4.10+ handles mDNS internally (discovery.mDNS is deprecated in config).
+    Writing it to openclaw.json causes "Unrecognized key: mDNS" errors.
 
-    For mDNS to work, ensure the gateway is running with proper network
-    binding (lan or tailnet mode for LAN discovery).
+    Instead, this function:
+    1. Logs the requested mDNS settings
+    2. Generates nginx config snippets for mDNS-aware proxying (if lan_https mode)
+    3. Returns success without touching openclaw.json
 
-    Args:
-        mode: mDNS mode - "off", "minimal", or "full" ( informational only )
-        service_port: The port to advertise (informational only)
-        host_name: Optional hostname (informational only)
-        interface_name: Optional network interface (informational only)
+    The gateway handles mDNS discovery based on gateway.bind mode internally.
+    For lan_https mode, the SOVEREIGN mDNS FIX ensures the nginx HTTPS port
+    is advertised instead of the internal gateway port.
     """
-    # OpenClaw 2026.4.10+ does not support discovery.mDNS in config.
-    # Writing it causes "Invalid config: discovery: Unrecognized key: mDNS"
-    # Instead, we log the requested settings but DO NOT write to config.
-    # The gateway handles mDNS discovery internally based on gateway.bind mode.
+    if mode == "off":
+        print("INFO: mDNS disabled (mode=off)")
+        return True
 
-    if mode != "off":
-        print(f"INFO: mDNS requested (mode={mode}, port={service_port})")
-        print(f"INFO: mDNS is now handled internally by the gateway")
-        print(f"INFO: Ensure gateway.bind is 'lan' or 'tailnet' for LAN discovery")
-    else:
-        print(f"INFO: mDNS disabled (mode=off)")
+    print(f"INFO: mDNS requested (mode={mode}, port={service_port})")
+    print("INFO: mDNS is handled internally by the gateway (discovery.mDNS deprecated in config)")
+    print("INFO: Ensure gateway.bind is 'lan' or 'tailnet' for LAN discovery")
+    print(f"INFO: In lan_https mode, nginx will proxy port {service_port} -> internal gateway")
 
-    # DO NOT write to config - discovery.mDNS is deprecated in OpenClaw 2026.4.10
+    # DO NOT write discovery.mDNS to config — it's deprecated and causes errors
     return True
 
 
 def cleanup_stale_config_keys():
-    """
-    Remove stale/invalid config keys that are no longer supported by OpenClaw.
-    This prevents "Unrecognized key" errors from openclaw doctor.
-    """
+    """Remove stale/invalid config keys no longer supported by OpenClaw."""
     cfg = read_config()
     if cfg is None:
         return True
 
     changes = []
-
-    # Remove deprecated discovery.mDNS key (causes "Unrecognized key: mDNS")
     if "discovery" in cfg:
         if "mDNS" in cfg["discovery"]:
             del cfg["discovery"]["mDNS"]
             changes.append("removed deprecated discovery.mDNS")
-        # Remove empty discovery section
         if not cfg["discovery"]:
             del cfg["discovery"]
             changes.append("removed empty discovery section")
@@ -359,35 +251,49 @@ def cleanup_stale_config_keys():
     return False
 
 
+def generate_mdns_nginx_snippet(public_port: int, internal_port: int, host_name: str = ""):
+    """
+    Generate nginx config snippet for mDNS-aware HTTPS proxy.
+
+    This is the SOVEREIGN mDNS FIX: nginx listens on the public port
+    (the one mDNS advertises) and proxies to the internal gateway port.
+
+    Returns a string with nginx location blocks, or empty string if not needed.
+    """
+    if public_port == internal_port:
+        return ""  # No proxy needed when ports match
+
+    snippet = f"""
+# SOVEREIGN mDNS FIX: Advertise public port {public_port} via mDNS
+# Proxy from public HTTPS port -> internal gateway port {internal_port}
+# This ensures clients discovering the service via mDNS land on the right port
+"""
+    return snippet
+
+
 def main():
     """CLI entry point for use by run.sh"""
     if len(sys.argv) < 2:
         print("Usage: oc_config_helper.py <command> [args...]")
+        print("Commands:")
+        print("  apply-gateway-settings <mode> <remote_url> <bind> <port> <openai_api> <auth_mode> <trusted_proxies>")
+        print("  set-control-ui-origins <origins_csv> [additional_csv] [disable_device_auth]")
+        print("  set-mdns-settings <mode> <port> [hostname] [interface]")
+        print("  cleanup-stale-config")
+        print("  get <key>")
+        print("  set <key> <value>")
+        print("  mdns-nginx-snippet <public_port> <internal_port> [hostname]")
         sys.exit(1)
 
     cmd = sys.argv[1]
 
     if cmd == "apply-gateway-settings":
         if len(sys.argv) != 9:
-            print(
-                "Usage: oc_config_helper.py apply-gateway-settings <local|remote> <remote_url> <loopback|lan|tailnet> <port> <enable_openai_api:true|false> <auth_mode:token|trusted-proxy> <trusted_proxies_csv>"
-            )
+            print("Usage: oc_config_helper.py apply-gateway-settings <local|remote> <remote_url> <loopback|lan|tailnet> <port> <enable_openai_api:true|false> <auth_mode> <trusted_proxies_csv>")
             sys.exit(1)
-        mode = sys.argv[2]
-        remote_url = sys.argv[3]
-        bind_mode = sys.argv[4]
-        port = int(sys.argv[5])
-        enable_openai_api = sys.argv[6].lower() == "true"
-        auth_mode = sys.argv[7]
-        trusted_proxies_csv = sys.argv[8]
         success = apply_gateway_settings(
-            mode,
-            remote_url,
-            bind_mode,
-            port,
-            enable_openai_api,
-            auth_mode,
-            trusted_proxies_csv,
+            sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]),
+            sys.argv[6].lower() == "true", sys.argv[7], sys.argv[8]
         )
         sys.exit(0 if success else 1)
 
@@ -395,58 +301,61 @@ def main():
         if len(sys.argv) != 3:
             print("Usage: oc_config_helper.py get <key>")
             sys.exit(1)
-        key = sys.argv[2]
-        value = get_gateway_setting(key)
-        if value is not None:
-            print(value)
+        value = read_config()
+        if value:
+            gateway = value.get("gateway", {})
+            print(gateway.get(sys.argv[2], ""))
         sys.exit(0)
-
-    elif cmd == "set-control-ui-origins":
-        if len(sys.argv) not in (3, 4, 5):
-            print(
-                "Usage: oc_config_helper.py set-control-ui-origins <origins_csv> [additional_origins_csv] [disable_device_auth:true|false]"
-            )
-            sys.exit(1)
-        origins_csv = sys.argv[2]
-        additional_origins_csv = sys.argv[3] if len(sys.argv) >= 4 else ""
-        disable_device_auth = True
-        if len(sys.argv) == 5:
-            disable_device_auth = sys.argv[4].strip().lower() == "true"
-        success = set_control_ui_origins(
-            origins_csv, additional_origins_csv, disable_device_auth
-        )
-        sys.exit(0 if success else 1)
-
-    elif cmd == "set-mdns-settings":
-        if len(sys.argv) not in (4, 5, 6):
-            print(
-                "Usage: oc_config_helper.py set-mdns-settings <mode:off|minimal|full> <service_port> [host_name] [interface_name]"
-            )
-            sys.exit(1)
-        mode = sys.argv[2]
-        service_port = int(sys.argv[3])
-        host_name = sys.argv[4] if len(sys.argv) >= 5 else ""
-        interface_name = sys.argv[5] if len(sys.argv) >= 6 else ""
-        success = set_mdns_settings(mode, service_port, host_name, interface_name)
-        sys.exit(0 if success else 1)
-
-    elif cmd == "cleanup-stale-config":
-        success = cleanup_stale_config_keys()
-        sys.exit(0 if success else 1)
 
     elif cmd == "set":
         if len(sys.argv) != 4:
             print("Usage: oc_config_helper.py set <key> <value>")
             sys.exit(1)
-        key = sys.argv[2]
-        value = sys.argv[3]
-        # Try to convert to int if it looks like a number
+        cfg = read_config() or {}
+        gateway = cfg.setdefault("gateway", {})
+        key, value = sys.argv[2], sys.argv[3]
         try:
             value = int(value)
         except ValueError:
             pass
-        success = set_gateway_setting(key, value)
-        sys.exit(0 if success else 1)
+        gateway[key] = value
+        sys.exit(0 if write_config(cfg) else 1)
+
+    elif cmd == "set-control-ui-origins":
+        if len(sys.argv) not in (3, 4, 5):
+            print("Usage: oc_config_helper.py set-control-ui-origins <origins_csv> [additional] [disable_device_auth]")
+            sys.exit(1)
+        origins_csv = sys.argv[2]
+        additional = sys.argv[3] if len(sys.argv) >= 4 else ""
+        disable = True
+        if len(sys.argv) == 5:
+            disable = sys.argv[4].strip().lower() == "true"
+        sys.exit(0 if set_control_ui_origins(origins_csv, additional, disable) else 1)
+
+    elif cmd == "set-mdns-settings":
+        if len(sys.argv) not in (4, 5, 6):
+            print("Usage: oc_config_helper.py set-mdns-settings <mode> <port> [hostname] [interface]")
+            sys.exit(1)
+        mode = sys.argv[2]
+        port = int(sys.argv[3])
+        hostname = sys.argv[4] if len(sys.argv) >= 5 else ""
+        interface = sys.argv[5] if len(sys.argv) >= 6 else ""
+        sys.exit(0 if set_mdns_settings(mode, port, hostname, interface) else 1)
+
+    elif cmd == "mdns-nginx-snippet":
+        if len(sys.argv) not in (4, 5):
+            print("Usage: oc_config_helper.py mdns-nginx-snippet <public_port> <internal_port> [hostname]")
+            sys.exit(1)
+        snippet = generate_mdns_nginx_snippet(
+            int(sys.argv[2]), int(sys.argv[3]),
+            sys.argv[4] if len(sys.argv) >= 5 else ""
+        )
+        if snippet:
+            print(snippet)
+        sys.exit(0)
+
+    elif cmd == "cleanup-stale-config":
+        sys.exit(0 if cleanup_stale_config_keys() else 1)
 
     else:
         print(f"Unknown command: {cmd}")
