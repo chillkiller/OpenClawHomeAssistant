@@ -525,6 +525,7 @@ echo "DEBUG: Passed SINGLE-INSTANCE GUARD"
 # ------------------------------------------------------------------------------
 # ZOMBIE CLEANUP: Remove any zombie processes from previous runs
 # ------------------------------------------------------------------------------
+echo "DEBUG: Entering ZOMBIE CLEANUP section"
 ZOMBIE_PIDS=$(ps aux | grep -E '\[sh\] <defunct>' | awk '{print $2}')
 if [ -n "$ZOMBIE_PIDS" ]; then
   echo "INFO: Cleaning up $(($(echo "$ZOMBIE_PIDS" | wc -w))) zombie process(es) from previous run"
@@ -587,6 +588,7 @@ fi
 
 
 # ------------------------------------------------------------------------------
+echo "DEBUG: Entering TOKEN STORE section"
 # Store tokens / export env vars (optional)
 # ------------------------------------------------------------------------------
 
@@ -598,6 +600,7 @@ fi
 
 # ------------------------------------------------------------------------------
 # OpenClaw config is managed by OpenClaw itself (onboarding / configure).
+echo "DEBUG: Entering SHUTDOWN HANDLER section"
 # This add-on intentionally does NOT create/patch /config/.openclaw/openclaw.json.
 # ------------------------------------------------------------------------------
 
@@ -656,11 +659,13 @@ shutdown() {
 trap shutdown INT TERM
 
 if ! command -v openclaw >/dev/null 2>&1; then
+echo "DEBUG: Entering OPENCLAW BINARY CHECK section"
   echo "ERROR: openclaw is not installed."
   exit 1
 fi
 
 # Bootstrap minimal OpenClaw config ONLY if missing.
+echo "DEBUG: Entering CONFIG BOOTSTRAP section"
 # We do not overwrite or patch existing configs; onboarding owns everything else.
 OPENCLAW_CONFIG_PATH="/config/.openclaw/openclaw.json"
 
@@ -697,6 +702,7 @@ PY
 fi
 
 # ------------------------------------------------------------------------------
+echo "DEBUG: Entering GATEWAY SETTINGS APPLY section"
 # Apply gateway LAN mode settings safely using helper script
 # This updates gateway.bind and gateway.port without touching other settings
 # ------------------------------------------------------------------------------
@@ -734,6 +740,7 @@ if [ "$GATEWAY_AUTH_MODE" = "trusted-proxy" ]; then
 fi
 
 # ------------------------------------------------------------------------------
+echo "DEBUG: Entering TLS CERTIFICATE section"
 # TLS certificate generation for built-in HTTPS proxy (lan_https mode)
 # Generates a local CA + server cert so phones/tablets get proper HTTPS.
 # The CA cert can be installed once on a device for trusted access.
@@ -860,6 +867,7 @@ PY
 fi
 
 # ------------------------------------------------------------------------------
+echo "DEBUG: Entering PROXY SHIM section"
 # Proxy shim for undici/OpenClaw startup
 # Keep official OpenClaw npm release while enabling HTTP(S)_PROXY support.
 # ------------------------------------------------------------------------------
@@ -875,6 +883,7 @@ fi
 
 # ------------------------------------------------------------------------------
 # Auto-configure MCP (Model Context Protocol) for Home Assistant
+echo "DEBUG: Entering MCP AUTO-CONFIGURE section"
 # Registers HA as an MCP server so OpenClaw can control HA entities/services.
 # Requires: homeassistant_token set in add-on options + mcporter CLI available.
 # Runs once; re-runs when the token changes.
@@ -914,6 +923,7 @@ if [ "$AUTO_CONFIGURE_MCP" = "true" ] && [ -n "$HA_TOKEN" ]; then
   fi
 elif [ "$AUTO_CONFIGURE_MCP" = "true" ] && [ -z "$HA_TOKEN" ]; then
   echo "INFO: MCP auto-configure enabled but homeassistant_token not set — skipping"
+echo "DEBUG: Entering start_openclaw_runtime function"
   echo "INFO: To auto-configure, set homeassistant_token in add-on Configuration, then restart"
 fi
 
@@ -1056,6 +1066,7 @@ find_gateway_daemon_pid() {
   return 1
 }
 
+echo "DEBUG: Before calling start_openclaw_runtime"
 if ! start_openclaw_runtime; then
   exit 1
 fi
