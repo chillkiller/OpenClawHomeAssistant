@@ -243,18 +243,17 @@ RAM_MODE="power"
 echo "INFO: Detected ${TOTAL_RAM_GB}GB RAM -> ${RAM_MODE} mode"
 
 if [ "$RAM_MODE" = "power" ]; then
-  NODE_HEAP_SIZE=6144
+  NODE_HEAP_SIZE=3072
 else
   NODE_HEAP_SIZE=2048
 fi
 
-WASM_MEM_PAGES="--experimental-wasm-max-mem-pages=65536"
 if [ -z "${NODE_OPTIONS:-}" ]; then
-  export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_SIZE} ${WASM_MEM_PAGES}"
+  export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_SIZE}"
 else
-  export NODE_OPTIONS="${NODE_OPTIONS} --max-old-space-size=${NODE_HEAP_SIZE} ${WASM_MEM_PAGES}"
+  export NODE_OPTIONS="${NODE_OPTIONS} --max-old-space-size=${NODE_HEAP_SIZE}"
 fi
-echo "INFO: Node.js memory: max-old-space-size=${NODE_HEAP_SIZE}, wasm-max-mem-pages=65536"
+echo "INFO: Node.js memory: max-old-space-size=${NODE_HEAP_SIZE}"
 echo "INFO: Section 4 done (RAM + Node.js memory)"
 
 # ------------------------------------------------------------------------------
