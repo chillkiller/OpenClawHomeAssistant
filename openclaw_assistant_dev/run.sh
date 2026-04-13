@@ -957,7 +957,8 @@ PY
     # shellcheck disable=SC2086
     openclaw node run --host "$NODE_HOST" --port "$NODE_PORT" $NODE_TLS_FLAG &
   else
-    openclaw gateway run &
+    mkdir -p /config/clawd/logs
+    openclaw gateway run > /config/clawd/logs/gateway_startup.log 2>&1 &
   fi
   GW_PID=$!
   return 0
