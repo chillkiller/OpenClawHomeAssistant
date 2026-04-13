@@ -170,12 +170,14 @@ else
   NODE_HEAP_SIZE=2048
 fi
 
+# Add WASM memory pages to stabilize undici/llhttp Wasm instance
+WASM_MEM_PAGES="--experimental-wasm-max-mem-pages=65536"
 if [ -z "${NODE_OPTIONS:-}" ]; then
-  export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_SIZE}"
+  export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_SIZE} ${WASM_MEM_PAGES}"
 else
-  export NODE_OPTIONS="${NODE_OPTIONS} --max-old-space-size=${NODE_HEAP_SIZE}"
+  export NODE_OPTIONS="${NODE_OPTIONS} --max-old-space-size=${NODE_HEAP_SIZE} ${WASM_MEM_PAGES}"
 fi
-echo "INFO: Node.js memory limit set (NODE_OPTIONS=--max-old-space-size=${NODE_HEAP_SIZE})"
+echo "INFO: Node.js memory limit set (NODE_OPTIONS=--max-old-space-size=${NODE_HEAP_SIZE}, --experimental-wasm-max-mem-pages=65536)"
 
 # HA add-ons mount persistent storage at /config (maps to /addon_configs/<slug> on the host).
 export HOME=/config
@@ -194,10 +196,10 @@ mkdir -p "$NODE_COMPILE_CACHE"
 echo "INFO: NODE_COMPILE_CACHE enabled at $NODE_COMPILE_CACHE"
 
 # =============================================================================
-# RESOURCE LIMITS: Prevent virtual memory exhaustion
+# RESOURCE LIMITS: Prevent virtual memory exhaustion (WASM OOM fix)
 # =============================================================================
-ulimit -v 8388608
-echo "INFO: Virtual memory limit set to 8GB (ulimit -v 8388608)"
+ulimit -v 4194304
+echo "INFO: Virtual memory limit set to 4GB (ulimit -v 4194304)"
 
 # =============================================================================
 # HOME Consistency: Sync /root to /config to avoid fragmentation
@@ -255,13 +257,14 @@ mkdir -p /config/.openclaw /config/.openclaw/identity /config/clawd /config/keys
 echo "DEBUG: Reached after mkdir -p dirs section"
 
 # Setup tmpfs mounts for RAM disks based on RAM mode
-# Power mode: 4x 2GB = 8GB total (npm_cache, node_tmp, chromium_cache, logs)
-# Safe mode: 1.4GB total (npm_cache 256MB, node_tmp 384MB, chromium_cache 512MB, logs 256MB)
+# Power mode (>8GB): 512M + 256M + 256M + 128M = 1.1GB total (npm_cache, node_tmp, chromium_cache, logs)
+# Safe mode (<=8GB): 256M + 128M + 128M + 64M = 576MB total (npm_cache, node_tmp, chromium_cache, logs)
+# Reduced sizes to prevent WASM OOM in undici/llhttp
 if [ "$RAM_MODE" = "power" ]; then
-  TMPFS_SIZES="2G 2G 2G 2G"
+  TMPFS_SIZES="512M 256M 256M 128M"
   MOUNT_NAMES="npm_cache node_tmp chromium_cache logs"
 else
-  TMPFS_SIZES="256M 384M 512M 256M"
+  TMPFS_SIZES="256M 128M 128M 64M"
   MOUNT_NAMES="npm_cache node_tmp chromium_cache logs"
 fi
 
