@@ -1,6 +1,6 @@
-# Dockerfile for OpenClaw Dev-Addon v0.6.1.7
+# Dockerfile for OpenClaw Dev-Addon v0.6.1.8
 # Multi-stage build for disk space optimization
-# FIXED: Added sudo package (was missing causing Homebrew install failure)
+# FIXED: Added sudo package, HEALTHCHECK for HA Watchdog, run.sh root-safety
 FROM debian:trixie-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -202,5 +202,10 @@ RUN chmod +x /run.sh /oc_config_helper.py /render_nginx.py /usr/local/bin/oc-cle
 
 RUN mkdir -p /config/.local/lib/python3.11/site-packages
 ENV PYTHONPATH=/config/.local/lib/python3.11/site-packages:
+
+# Health check for Home Assistant Supervisor Watchdog
+# 120s start-period accounts for Homebrew sync, skill copy, and gateway init on slow hardware
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:48099/ || exit 1
 
 CMD [ "/run.sh" ]

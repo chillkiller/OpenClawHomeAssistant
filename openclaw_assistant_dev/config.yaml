@@ -1,8 +1,9 @@
-# OpenClaw Dev-Addon v0.6.1.7 Configuration
+# OpenClaw Dev-Addon v0.6.1.8 Configuration
 # FIXED: Added sudo package to Dockerfile (caused Homebrew install failure)
+# FIXED: Added HEALTHCHECK for HA Watchdog (was causing boot-loop)
 
 name: OpenClaw Assistant (Dev)
-version: "0.6.1.7"
+version: "0.6.1.8"
 slug: openclaw_assistant_dev
 description: OpenClaw Home Assistant Addon (Development Branch - Trixie)
 url: https://github.com/chillkiller/OpenClawHomeAssistant
