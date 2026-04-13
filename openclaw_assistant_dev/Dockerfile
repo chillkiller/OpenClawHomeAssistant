@@ -1,4 +1,4 @@
-# Dockerfile for OpenClaw Dev-Addon v0.6.1.8
+# Dockerfile for OpenClaw Dev-Addon v0.6.1.4
 # Multi-stage build for disk space optimization
 # FIXED: Added sudo package, HEALTHCHECK for HA Watchdog, run.sh root-safety
 FROM debian:trixie-slim AS builder
