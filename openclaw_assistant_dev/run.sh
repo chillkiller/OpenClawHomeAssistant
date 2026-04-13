@@ -279,10 +279,10 @@ idx=0
 for mount in $MOUNT_NAMES; do
   mount_path="/tmp/openclaw/${mount}"
   mkdir -p "$mount_path"
-  size=$(echo $TMPFS_SIZES | cut -d' ' -f$((idx + 1)))
-  if ! mountpoint -q "$mount_path" 2>/dev/null; then
-    mount -t tmpfs -o size=${size},noatime,nodev,nosuid,noexec "${mount_path}" "${mount_path}" 2>/dev/null || true
-  fi
+  # tmpfs mount DISABLED: HA containers lack CAP_SYS_ADMIN
+  # Attempting `mount -t tmpfs` causes immediate process kill by kernel
+  # Cache dirs will use regular disk paths under /tmp/openclaw/ instead
+  echo "DEBUG: Skipping tmpfs mount for ${mount_path} (HA container lacks CAP_SYS_ADMIN)"
   idx=$((idx + 1))
 done
 
