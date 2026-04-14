@@ -91,6 +91,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Database Tools (P1)
     postgresql-client \
     libpq-dev \
+    python3-psycopg2 \
+    python3-pyodbc \
     # Dev-Tools (P2)
     tmux \
     ripgrep \
@@ -182,7 +184,7 @@ RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch
 # =============================================================================
 # Install OpenClaw v0.6.6 (pinned version)
 # =============================================================================
-RUN npm install -g openclaw@2026.4.12 \
+RUN npm install -g openclaw@2026.4.10 \
     && npm install -g pnpm \
     && npm cache clean --force
 
