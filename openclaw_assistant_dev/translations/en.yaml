@@ -1,11 +1,11 @@
 configuration:
   timezone:
     name: Timezone
-    description: Timezone for the add-on (e.g., Europe/Sofia, America/New_York)
+    description: Timezone for the add-on (e.g., Europe/Berlin, America/New_York)
   
   enable_terminal:
     name: Enable Web Terminal
-    description: Enable web terminal Button inside Home Assistant (Ingress) via ttyd
+    description: Enable web terminal button inside Home Assistant (Ingress) via ttyd
   
   terminal_port:
     name: Terminal Port
@@ -98,24 +98,58 @@ configuration:
   enable_openai_api:
     name: Enable OpenAI API
     description: Enable OpenAI-compatible Chat Completions endpoint. Allows using OpenClaw as a conversation agent in HA Assist pipeline via Extended OpenAI Conversation (HACS) or any OpenAI-compatible client.
+
   force_ipv4_dns:
     name: Force IPv4 DNS Order
     description: Force IPv4-first DNS ordering for Node network calls. Most HAOS VMs lack IPv6 egress, causing web_fetch and Telegram timeouts. Recommended ON (default).
+
   nginx_log_level:
     name: Nginx Log Level
     description: "Access log verbosity for the built-in nginx proxy. 'minimal' (default) suppresses repetitive HA health-check and polling requests. 'full' logs everything."
     options:
       minimal: "Minimal (suppress HA polling noise)"
       full: "Full (log all requests)"
-  gateway_env_vars:
-    name: Gateway Environment Variables
-    description: Environment variables passed to the OpenClaw gateway process at startup (list entries with name/value in Home Assistant UI; max 50 variables, keys up to 255 characters, values up to 10,000 characters).
+
+  mdns_mode:
+    name: mDNS Mode
+    description: "mDNS/Bonjour configuration for LAN discovery. 'off' disables mDNS, 'minimal' advertises the gateway service (default), 'full' advertises with all metadata."
+    options:
+      off: "Off (no mDNS)"
+      minimal: "Minimal (advertise gateway service, default)"
+      full: "Full (advertise with all metadata)"
+
   mdns_host_name:
     name: mDNS Host Name
     description: Optional hostname for mDNS advertisement (e.g., homeassistant.local). If empty, auto-detected from container hostname.
+
   mdns_service_port:
     name: mDNS Service Port
     description: Port advertised by mDNS for discovery. Defaults to the gateway port (18789). Should match the external proxy port in lan_https mode.
+
+  mdns_interface_name:
+    name: mDNS Network Interface
+    description: Optional network interface name for mDNS (e.g., eth0, wlan0). If empty, auto-detected.
+
+  gateway_log_to_console:
+    name: Show Gateway Log in HA Log
+    description: When ON, gateway output (stdout/stderr) is mirrored to the Home Assistant add-on log window in addition to the log file. Useful for real-time diagnostics. When OFF, logs are written to file only.
+
+  trace_log_to_console:
+    name: Show Boot Trace in HA Log
+    description: When ON, the detailed boot sequence trace (set -x output) is mirrored to the Home Assistant add-on log window in addition to the log file. Very verbose — enable only for debugging.
+
+  gateway_env_vars:
+    name: Gateway Environment Variables
+    description: Environment variables passed to the OpenClaw gateway process at startup (list entries with name/value in Home Assistant UI; max 50 variables, keys up to 255 characters, values up to 10,000 characters).
+
   auto_configure_mcp:
     name: Auto-Configure MCP for Home Assistant
     description: "When ON and Home Assistant Token is set, automatically registers Home Assistant as an MCP server on each startup. This lets OpenClaw control HA entities, services, and automations via the Model Context Protocol. Disable only if you manage mcporter configuration manually."
+
+  runtime_apt_packages:
+    name: Runtime APT Packages
+    description: Optional - Space-separated list of APT packages to install at container startup. Packages are reinstalled on each restart (not persistent in image). Example - ffmpeg postgresql-client
+
+  custom_init_script:
+    name: Custom Init Script
+    description: Optional - Path to an executable script that runs before OpenClaw starts. Must be idempotent. Mount via /config/ or /share/. Example - /share/scripts/my-init.sh

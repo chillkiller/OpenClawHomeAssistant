@@ -1,7 +1,7 @@
 configuration:
   timezone:
     name: Zeitzone
-    description: Zeitzone für das Add-on (z.B. Europe/Sofia, America/New_York)
+    description: Zeitzone für das Add-on (z.B. Europe/Berlin, America/New_York)
   
   enable_terminal:
     name: Web-Terminal aktivieren
@@ -9,11 +9,11 @@ configuration:
   
   terminal_port:
     name: Terminal-Port
-    description: Portnummer für das Web-Terminal (Standard - 7681). Ändern Sie diese, wenn dieser Port mit einem anderen Dienst in Konflikt steht.
+    description: Portnummer für das Web-Terminal (Standard - 7681). Ändern, wenn dieser Port mit einem anderen Dienst kollidiert.
   
   gateway_public_url:
     name: Öffentliche Gateway-URL
-    description: Öffentliche Basis-URL zum Öffnen der Gateway-Weboberfläche in einem neuen Tab (nicht eingebettet). Beispiel - https://example.duckdns.org:12345 oder http://192.168.1.10:18789
+    description: Öffentliche Basis-URL zum Öffnen der Gateway-Weboberfläche in einem neuen Tab (nicht eingebettet). Beispiel - https://meinserver.duckdns.org:12345 oder http://192.168.1.10:18789
   
   homeassistant_token:
     name: Home Assistant Token
@@ -86,7 +86,7 @@ configuration:
 
   gateway_auth_mode:
     name: Gateway-Authentifizierungsmodus
-    description: Gateway-Auth-Modus - token (Standard) oder trusted-proxy (für HTTPS-Reverse-Proxys). Wird überschrieben wenn access_mode nicht Benutzerdefiniert ist.
+    description: Gateway-Auth-Modus - token (Standard) oder trusted-proxy (für HTTPS-Reverse-Proxys). Wird überschrieben wenn Zugriffsmodus nicht auf Benutzerdefiniert steht.
     options:
       token: "Token (Standard)"
       trusted-proxy: "Vertrauenswürdiger Proxy (für Reverse-Proxys)"
@@ -97,25 +97,59 @@ configuration:
 
   enable_openai_api:
     name: OpenAI API aktivieren
-    description: OpenAI-kompatiblen Chat Completions Endpunkt aktivieren. Ermöglicht die Verwendung von OpenClaw als Gesprächsagent in der HA Assist Pipeline über Extended OpenAI Conversation (HACS) oder jeden OpenAI-kompatiblen Client.
+    description: OpenAI-kompatiblen Chat-Completions-Endpunkt aktivieren. Ermöglicht die Verwendung von OpenClaw als Gesprächsagent in der HA-Assist-Pipeline über Extended OpenAI Conversation (HACS) oder jeden OpenAI-kompatiblen Client.
+
   force_ipv4_dns:
     name: IPv4-DNS-Reihenfolge erzwingen
     description: Erzwingt IPv4-vorrangige DNS-Auflösung. Die meisten HAOS-VMs haben keinen IPv6-Ausgang — verursacht web_fetch- und Telegram-Timeouts. Empfohlen EIN (Standard).
+
   nginx_log_level:
     name: Nginx Log-Level
     description: "Ausführlichkeit des Nginx-Zugriffslogs. 'minimal' (Standard) unterdrückt wiederholte HA-Healthcheck- und Polling-Anfragen. 'full' protokolliert alles."
     options:
       minimal: "Minimal (HA-Polling-Rauschen unterdrücken)"
       full: "Vollständig (alle Anfragen protokollieren)"
+
+  mdns_mode:
+    name: mDNS-Modus
+    description: "mDNS/Bonjour-Konfiguration für LAN-Erkennung. 'off' deaktiviert mDNS, 'minimal' bewirbt den Gateway-Dienst (Standard), 'full' bewirbt mit allen Metadaten."
+    options:
+      off: "Aus (kein mDNS)"
+      minimal: "Minimal (Gateway-Dienst bewerben, Standard)"
+      full: "Vollständig (alle Metadaten bewerben)"
+
+  mdns_host_name:
+    name: mDNS-Hostname
+    description: Optionaler Hostname für mDNS-Advertisements (z.B. homeassistant.local). Wenn leer, wird der Container-Hostname automatisch erkannt.
+
+  mdns_service_port:
+    name: mDNS-Dienst-Port
+    description: Port, der über mDNS für die Erkennung angekündigt wird. Standard ist der Gateway-Port (18789). Sollte im lan_https-Modus dem externen Proxy-Port entsprechen.
+
+  mdns_interface_name:
+    name: mDNS-Netzwerkschnittstelle
+    description: Optionaler Name der Netzwerkschnittstelle für mDNS (z.B. eth0, wlan0). Wenn leer, wird die Schnittstelle automatisch erkannt.
+
+  gateway_log_to_console:
+    name: Gateway-Log in HA-Log anzeigen
+    description: Wenn EIN, wird die Gateway-Ausgabe (stdout/stderr) zusätzlich zur Log-Datei auch im Home Assistant Add-on-Log-Fenster angezeigt. Nützlich für Echtzeit-Diagnose. Bei AUS werden Logs nur in die Datei geschrieben.
+
+  trace_log_to_console:
+    name: Boot-Trace in HA-Log anzeigen
+    description: Wenn EIN, wird die detaillierte Boot-Sequenz (set -x Trace) zusätzlich zur Log-Datei auch im Home Assistant Add-on-Log-Fenster angezeigt. Sehr ausführlich — nur für Fehleranalyse aktivieren.
+
   gateway_env_vars:
     name: Gateway-Umgebungsvariablen
     description: Umgebungsvariablen, die beim Start an den OpenClaw-Gateway-Prozess übergeben werden (Liste mit name/value-Einträgen in der Home Assistant UI; max. 50 Variablen, Schlüssel bis 255 Zeichen, Werte bis 10.000 Zeichen).
-  mdns_host_name:
-    name: mDNS Hostname
-    description: Optionaler Hostname für mDNS-Advertisements (z.B. homeassistant.local). Wenn leer, wird der Container-Hostname automatisch erkannt.
-  mdns_service_port:
-    name: mDNS-Dienst-Port
-    description: Port, der über mDNS für die Erkennung angekündigt wird. Standard ist der Gateway-Port (18789). Sollte dem externen Proxy-Port im lan_https-Modus entsprechen.
+
   auto_configure_mcp:
     name: MCP für Home Assistant automatisch konfigurieren
-    description: "Wenn AN und Home Assistant Token gesetzt ist, wird Home Assistant bei jedem Start automatisch als MCP-Server registriert. Das erlaubt OpenClaw, HA-Geräte, -Dienste und -Automatisierungen über das Model Context Protocol zu steuern. Nur deaktivieren, wenn Sie die mcporter-Konfiguration manuell verwalten."
+    description: "Wenn AN und Home Assistant Token gesetzt ist, wird Home Assistant bei jedem Start automatisch als MCP-Server registriert. Das erlaubt OpenClaw, HA-Geräte, -Dienste und -Automatisierungen über das Model Context Protocol zu steuern. Nur deaktivieren, wenn die mcporter-Konfiguration manuell verwaltet wird."
+
+  runtime_apt_packages:
+    name: Laufzeit-APT-Pakete
+    description: Optional - Leerzeichengetrennte Liste von APT-Paketen, die bei jedem Container-Start installiert werden. Pakete werden bei Neustarts neu installiert (nicht im Image persistent). Beispiel - ffmpeg postgresql-client
+
+  custom_init_script:
+    name: Benutzerdefiniertes Init-Skript
+    description: Optional - Pfad zu einem ausführbaren Skript, das vor dem OpenClaw-Start ausgeführt wird. Muss idempotent sein. Über /config/ oder /share/ einbinden. Beispiel - /share/scripts/my-init.sh

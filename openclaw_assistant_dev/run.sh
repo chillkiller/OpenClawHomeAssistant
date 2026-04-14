@@ -6,9 +6,32 @@ set -euo pipefail
 # Best-of-All-Worlds: Trixie Full-Stack + coollabsio Persistence + techartdev HA-Integration
 # ==============================================================================
 
-# Debug logging to persistent storage
-mkdir -p /config/clawd/logs
-exec > >(tee -a /config/clawd/logs/run_full_trace.log) 2>&1
+# ------------------------------------------------------------------------------
+# Section 0: Log Rotation + Console Routing
+# ------------------------------------------------------------------------------
+LOG_DIR="/config/clawd/logs"
+mkdir -p "$LOG_DIR"
+
+# Log rotation: rotate files > 10MB before writing
+MAX_LOG_SIZE=10485760  # 10MB
+for log_file in "$LOG_DIR"/run_full_trace.log "$LOG_DIR"/gateway_startup.log; do
+  if [ -f "$log_file" ] && [ "$(stat -c%s "$log_file" 2>/dev/null || echo 0)" -gt "$MAX_LOG_SIZE" ]; then
+    mv -f "$log_file" "${log_file}.old" 2>/dev/null || true
+  fi
+done
+
+# Read log-to-console options early (OPTIONS_FILE defined below, but we need it now)
+OPTIONS_FILE_EARLY="/data/options.json"
+TRACE_LOG_TO_CONSOLE=$(jq -r '.trace_log_to_console // false' "$OPTIONS_FILE_EARLY" 2>/dev/null || echo false)
+GATEWAY_LOG_TO_CONSOLE=$(jq -r '.gateway_log_to_console // false' "$OPTIONS_FILE_EARLY" 2>/dev/null || echo false)
+
+if [ "$TRACE_LOG_TO_CONSOLE" = "true" ] || [ "$TRACE_LOG_TO_CONSOLE" = "1" ]; then
+  # Mirror trace to console AND file
+  exec > >(tee -a "$LOG_DIR/run_full_trace.log") 2>&1
+else
+  # Trace to file only (HA log window stays clean)
+  exec >> "$LOG_DIR/run_full_trace.log" 2>&1
+fi
 
 echo "=== RUN.SH START: $(date -Iseconds) ==="
 
@@ -79,6 +102,10 @@ MDNS_MODE=$(jq -r '.mdns_mode // "minimal"' "$OPTIONS_FILE")
 MDNS_HOST_NAME=$(jq -r '.mdns_host_name // ""' "$OPTIONS_FILE")
 MDNS_SERVICE_PORT=$(jq -r '.mdns_service_port // "'"$GATEWAY_PORT"'"' "$OPTIONS_FILE")
 MDNS_INTERFACE_NAME=$(jq -r '.mdns_interface_name // ""' "$OPTIONS_FILE")
+
+# Log-to-console options (already read in Section 0, but re-read for clarity)
+GATEWAY_LOG_TO_CONSOLE=$(jq -r '.gateway_log_to_console // false' "$OPTIONS_FILE")
+TRACE_LOG_TO_CONSOLE=$(jq -r '.trace_log_to_console // false' "$OPTIONS_FILE")
 
 # Gateway environment variables
 GW_ENV_VARS_TYPE=$(jq -r 'if .gateway_env_vars == null then "null" else (.gateway_env_vars | type) end' "$OPTIONS_FILE")
@@ -704,7 +731,13 @@ PY
     openclaw node run --host "$NODE_HOST" --port "$NODE_PORT" $NODE_TLS_FLAG &
   else
     mkdir -p /config/clawd/logs
-    openclaw gateway run > /config/clawd/logs/gateway_startup.log 2>&1 &
+    if [ "$GATEWAY_LOG_TO_CONSOLE" = "true" ] || [ "$GATEWAY_LOG_TO_CONSOLE" = "1" ]; then
+      # Mirror gateway output to console AND file
+      openclaw gateway run 2>&1 | tee -a /config/clawd/logs/gateway_startup.log &
+    else
+      # Gateway output to file only (HA log window stays clean)
+      openclaw gateway run > /config/clawd/logs/gateway_startup.log 2>&1 &
+    fi
   fi
   GW_PID=$!
   return 0
@@ -902,25 +935,80 @@ fi
 echo "INFO: Section 22 done (nginx started)"
 
 # ------------------------------------------------------------------------------
-# Section 23: Sovereign mDNS Fix
+# Section 23: mDNS / Avahi Configuration
 # ------------------------------------------------------------------------------
-if [ "$ENABLE_HTTPS_PROXY" = "true" ]; then
-  MDNS_HOSTNAME="${MDNS_HOST_NAME:-$(hostname -f 2>/dev/null || hostname)}"
-  if [ -f "$HELPER_PATH" ] && [ -f "$OPENCLAW_CONFIG_PATH" ]; then
-    echo "INFO: Configuring mDNS to advertise public HTTPS port $GATEWAY_PORT"
-    if python3 "$HELPER_PATH" set-mdns-settings minimal "$GATEWAY_PORT" "$MDNS_HOSTNAME" 2>/dev/null; then
-      echo "INFO: mDNS correctly configured to advertise port $GATEWAY_PORT"
+if [ "$MDNS_MODE" != "off" ]; then
+  # Start avahi-daemon if available
+  if command -v avahi-daemon >/dev/null 2>&1; then
+    if ! pgrep avahi-daemon >/dev/null 2>&1; then
+      echo "INFO: Starting avahi-daemon for mDNS discovery..."
+      # Ensure avahi socket dir exists
+      mkdir -p /run/avahi-daemon 2>/dev/null || true
+      # Generate minimal avahi config if missing
+      if [ ! -f /etc/avahi/avahi-daemon.conf ]; then
+        mkdir -p /etc/avahi
+        cat > /etc/avahi/avahi-daemon.conf << 'AVAHI_CONF'
+[server]
+use-ipv4=yes
+use-ipv6=no
+disallow-other-stacks=yes
+
+[wide-area]
+enable-wide-area=no
+
+[publish]
+publish-hinfo=no
+publish-addresses=yes
+publish-domain=yes
+AVAHI_CONF
+      fi
+      avahi-daemon -D 2>/dev/null || echo "WARN: avahi-daemon failed to start (mDNS may not work)"
+      sleep 1
+      if pgrep avahi-daemon >/dev/null 2>&1; then
+        echo "INFO: avahi-daemon started successfully"
+      else
+        echo "WARN: avahi-daemon not running after start attempt"
+      fi
     else
-      echo "WARN: mDNS configuration may be incorrect"
+      echo "INFO: avahi-daemon already running"
     fi
   else
-    echo "WARN: oc_config_helper.py not found; skipping mDNS fix"
+    echo "WARN: avahi-daemon not installed — mDNS will not work. Install avahi-daemon in the Dockerfile."
+  fi
+
+  # Configure mDNS in OpenClaw config
+  MDNS_HOSTNAME="${MDNS_HOST_NAME:-$(hostname -f 2>/dev/null || hostname)}"
+  MDNS_PORT="${MDNS_SERVICE_PORT:-$GATEWAY_PORT}"
+  if [ "$ENABLE_HTTPS_PROXY" = "true" ]; then
+    MDNS_PORT="$GATEWAY_PORT"
+    echo "INFO: mDNS advertising public HTTPS port $MDNS_PORT"
+  fi
+
+  if [ -f "$HELPER_PATH" ] && [ -f "$OPENCLAW_CONFIG_PATH" ]; then
+    if python3 "$HELPER_PATH" set-mdns-settings "$MDNS_MODE" "$MDNS_PORT" "$MDNS_HOSTNAME" 2>/dev/null; then
+      echo "INFO: mDNS configured (mode=$MDNS_MODE, port=$MDNS_PORT, host=$MDNS_HOSTNAME)"
+    else
+      echo "WARN: mDNS configuration via helper failed"
+    fi
+  else
+    echo "WARN: oc_config_helper.py not found; skipping mDNS config"
+  fi
+
+  # Optional: publish _openclaw._tcp service via avahi if avahi-publish is available
+  if [ "$MDNS_MODE" != "off" ] && command -v avahi-publish-service >/dev/null 2>&1; then
+    MDNS_IFACE_FLAG=""
+    if [ -n "$MDNS_INTERFACE_NAME" ]; then
+      MDNS_IFACE_FLAG="--iface=$MDNS_INTERFACE_NAME"
+    fi
+    avahi-publish-service $MDNS_IFACE_FLAG "OpenClaw Gateway" _openclaw._tcp "$MDNS_PORT" \
+      "mode=$MDNS_MODE" "hostname=$MDNS_HOSTNAME" &
+    echo "INFO: mDNS service _openclaw._tcp published (port=$MDNS_PORT)"
   fi
 else
-  echo "INFO: HTTPS proxy disabled; mDNS will advertise internal port"
+  echo "INFO: mDNS mode is off; skipping avahi and mDNS configuration"
 fi
 
-echo "INFO: Section 23 done (sovereign mDNS fix)"
+echo "INFO: Section 23 done (mDNS/avahi)"
 # ------------------------------------------------------------------------------
 # Section 24: Background Token Re-render
 # ------------------------------------------------------------------------------

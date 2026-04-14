@@ -6,7 +6,7 @@
 #   - Added custom init script option (coollabsio pattern)
 #   - Version bump to trigger HA rebuild
 name: OpenClaw Assistant (Dev)
-version: "0.7.2"
+version: "0.7.3"
 slug: openclaw_assistant_dev
 description: OpenClaw Home Assistant Addon (Development Branch - Trixie Full-Stack)
 url: https://github.com/chillkiller/OpenClawHomeAssistant
@@ -107,6 +107,12 @@ options:
   # Network interface for mDNS (empty = auto-detect)
   mdns_interface_name: ""
 
+  # Gateway log output: mirror gateway stdout/stderr to HA add-on log window
+  gateway_log_to_console: false
+
+  # Trace log output: mirror full boot trace (set -x) to HA add-on log window
+  trace_log_to_console: false
+
   # Environment variables to pass to the gateway process at startup.
   # Format: list of objects with name/value fields.
   # Example:
@@ -159,6 +165,8 @@ schema:
   mdns_host_name: str?
   mdns_service_port: int(1,65535)?
   mdns_interface_name: str?
+  gateway_log_to_console: bool?
+  trace_log_to_console: bool?
   gateway_env_vars:
     - name: "match(^[A-Z_][A-Z0-9_]*$)"
       value: str

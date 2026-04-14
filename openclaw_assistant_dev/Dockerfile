@@ -74,6 +74,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     jq \
     openssl \
+    # mDNS / Bonjour / Avahi (LAN discovery)
+    avahi-daemon \
+    avahi-utils \
+    libnss-mdns \
     # Audio/Media Stack (P0/P1 - missing in original)
     sox \
     libsox-fmt-all \
@@ -178,7 +182,7 @@ RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch
 # =============================================================================
 # Install OpenClaw v0.6.6 (pinned version)
 # =============================================================================
-RUN npm install -g openclaw@2026.4.10 \
+RUN npm install -g openclaw@2026.4.12 \
     && npm install -g pnpm \
     && npm cache clean --force
 

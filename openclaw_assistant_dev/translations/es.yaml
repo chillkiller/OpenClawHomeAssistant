@@ -1,7 +1,7 @@
 configuration:
   timezone:
     name: Zona horaria
-    description: Zona horaria para el complemento (ej. Europe/Sofia, America/New_York)
+    description: Zona horaria para el complemento (ej. Europe/Berlin, America/New_York)
   
   enable_terminal:
     name: Activar terminal web
@@ -13,7 +13,7 @@ configuration:
   
   gateway_public_url:
     name: URL pública del Gateway
-    description: URL base pública para abrir la interfaz web del Gateway en una nueva pestaña (no integrada). Ejemplo - https://example.duckdns.org:12345 o http://192.168.1.10:18789
+    description: URL base pública para abrir la interfaz web del Gateway en una nueva pestaña (no integrada). Ejemplo - https://ejemplo.duckdns.org:12345 o http://192.168.1.10:18789
   
   homeassistant_token:
     name: Token de Home Assistant
@@ -98,24 +98,58 @@ configuration:
   enable_openai_api:
     name: Activar API OpenAI
     description: Activar endpoint de Chat Completions compatible con OpenAI. Permite usar OpenClaw como agente de conversación en HA Assist pipeline mediante Extended OpenAI Conversation (HACS) o cualquier cliente compatible con OpenAI.
+
   force_ipv4_dns:
     name: Forzar orden DNS IPv4
     description: Fuerza prioridad IPv4 en DNS. La mayoría de VMs HAOS no tienen salida IPv6 — causa errores en web_fetch y Telegram. Recomendado ACTIVADO (por defecto).
+
   nginx_log_level:
     name: Nivel de log Nginx
     description: "Nivel de detalle del log de acceso de nginx. 'minimal' (por defecto) suprime las solicitudes repetitivas de health-check y polling de HA. 'full' registra todo."
     options:
       minimal: "Mínimo (suprimir ruido de polling HA)"
       full: "Completo (registrar todas las solicitudes)"
-  gateway_env_vars:
-    name: Variables de entorno del Gateway
-    description: Variables de entorno que se pasan al proceso del gateway OpenClaw al iniciarse (lista de entradas name/value en la UI de Home Assistant; maximo 50 variables, claves de hasta 255 caracteres, valores de hasta 10 000 caracteres).
+
+  mdns_mode:
+    name: Modo mDNS
+    description: "Configuración mDNS/Bonjour para descubrimiento en LAN. 'off' desactiva mDNS, 'minimal' anuncia el servicio gateway (predeterminado), 'full' anuncia con todos los metadatos."
+    options:
+      off: "Desactivado (sin mDNS)"
+      minimal: "Mínimo (anunciar servicio gateway, predeterminado)"
+      full: "Completo (anunciar con todos los metadatos)"
+
   mdns_host_name:
     name: Nombre de host mDNS
-    description: Nombre de host opcional para la publicidad mDNS (ej. homeassistant.local). Si está vacío, se detecta automáticamente desde el nombre de host del contenedor.
+    description: Nombre de host opcional para anuncio mDNS (ej. homeassistant.local). Si está vacío, se detecta automáticamente desde el nombre de host del contenedor.
+
   mdns_service_port:
     name: Puerto de servicio mDNS
     description: Puerto anunciado por mDNS para descubrimiento. Por defecto es el puerto del gateway (18789). Debe coincidir con el puerto del proxy externo en modo lan_https.
+
+  mdns_interface_name:
+    name: Interfaz de red mDNS
+    description: Nombre opcional de la interfaz de red para mDNS (ej. eth0, wlan0). Si está vacío, se detecta automáticamente.
+
+  gateway_log_to_console:
+    name: Mostrar log del Gateway en log de HA
+    description: Cuando está ACTIVADO, la salida del gateway (stdout/stderr) se refleja en la ventana de log del complemento de Home Assistant además del archivo de log. Útil para diagnóstico en tiempo real. Cuando está DESACTIVADO, los logs se escriben solo en el archivo.
+
+  trace_log_to_console:
+    name: Mostrar traza de arranque en log de HA
+    description: Cuando está ACTIVADO, la secuencia de arranque detallada (salida set -x) se refleja en la ventana de log del complemento de Home Assistant. Muy detallado — activar solo para depuración.
+
+  gateway_env_vars:
+    name: Variables de entorno del Gateway
+    description: Variables de entorno que se pasan al proceso del gateway OpenClaw al iniciarse (lista de entradas name/value en la UI de Home Assistant; máximo 50 variables, claves de hasta 255 caracteres, valores de hasta 10.000 caracteres).
+
   auto_configure_mcp:
     name: Configurar MCP automáticamente para Home Assistant
     description: "Cuando está ACTIVADO y el token de Home Assistant está configurado, registra automáticamente Home Assistant como servidor MCP en cada inicio. Esto permite a OpenClaw controlar entidades, servicios y automatizaciones de HA mediante el Model Context Protocol. Desactive solo si administra la configuración de mcporter manualmente."
+
+  runtime_apt_packages:
+    name: Paquetes APT en tiempo de ejecución
+    description: Opcional - Lista de paquetes APT separados por espacios para instalar al iniciar el contenedor. Los paquetes se reinstalan en cada reinicio (no persistentes en la imagen). Ejemplo - ffmpeg postgresql-client
+
+  custom_init_script:
+    name: Script de init personalizado
+    description: Opcional - Ruta a un script ejecutable que se ejecuta antes de OpenClaw. Debe ser idempotente. Monte mediante /config/ o /share/. Ejemplo - /share/scripts/my-init.sh
