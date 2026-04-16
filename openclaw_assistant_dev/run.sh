@@ -63,7 +63,7 @@ TZNAME=$(jq -r '.timezone // "Europe/Berlin"' "$OPTIONS_FILE")
 GW_PUBLIC_URL=$(jq -r '.gateway_public_url // empty' "$OPTIONS_FILE")
 HA_TOKEN=$(jq -r '.homeassistant_token // empty' "$OPTIONS_FILE")
 ADDON_HTTP_PROXY=$(jq -r '.http_proxy // empty' "$OPTIONS_FILE")
-ENABLE_TERMINAL=$(jq -r '.enable_terminal // true' "$OPTIONS_FILE")
+ENABLE_TERMINAL=$(jq -r 'if .enable_terminal == null then true else .enable_terminal end' "$OPTIONS_FILE")
 TERMINAL_PORT_RAW=$(jq -r '.terminal_port // 7681' "$OPTIONS_FILE")
 
 # SECURITY: Validate TERMINAL_PORT
@@ -80,8 +80,8 @@ ROUTER_USER=$(jq -r '.router_ssh_user // empty' "$OPTIONS_FILE")
 ROUTER_KEY=$(jq -r '.router_ssh_key_path // "/data/keys/router_ssh"' "$OPTIONS_FILE")
 
 # Lock cleanup
-CLEAN_LOCKS_ON_START=$(jq -r '.clean_session_locks_on_start // true' "$OPTIONS_FILE")
-CLEAN_LOCKS_ON_EXIT=$(jq -r '.clean_session_locks_on_exit // true' "$OPTIONS_FILE")
+CLEAN_LOCKS_ON_START=$(jq -r 'if .clean_session_locks_on_start == null then true else .clean_session_locks_on_start end' "$OPTIONS_FILE")
+CLEAN_LOCKS_ON_EXIT=$(jq -r 'if .clean_session_locks_on_exit == null then true else .clean_session_locks_on_exit end' "$OPTIONS_FILE")
 
 # Gateway configuration
 GATEWAY_MODE=$(jq -r '.gateway_mode // "local"' "$OPTIONS_FILE")
@@ -95,15 +95,15 @@ if [ "$GATEWAY_PORT" -ge 65535 ]; then
   GATEWAY_PORT=$((GATEWAY_PORT - 1))
 fi
 
-ENABLE_OPENAI_API=$(jq -r '.enable_openai_api // false' "$OPTIONS_FILE")
+ENABLE_OPENAI_API=$(jq -r 'if .enable_openai_api == null then false else .enable_openai_api end' "$OPTIONS_FILE")
 GATEWAY_AUTH_MODE=$(jq -r '.gateway_auth_mode // "token"' "$OPTIONS_FILE")
 GATEWAY_TRUSTED_PROXIES=$(jq -r '.gateway_trusted_proxies // empty' "$OPTIONS_FILE")
 GATEWAY_ADDITIONAL_ALLOWED_ORIGINS=$(jq -r '.gateway_additional_allowed_origins // empty' "$OPTIONS_FILE")
-CONTROLUI_DISABLE_DEVICE_AUTH=$(jq -r '.controlui_disable_device_auth // true' "$OPTIONS_FILE")
-FORCE_IPV4_DNS=$(jq -r '.force_ipv4_dns // true' "$OPTIONS_FILE")
+CONTROLUI_DISABLE_DEVICE_AUTH=$(jq -r 'if .controlui_disable_device_auth == null then true else .controlui_disable_device_auth end' "$OPTIONS_FILE")
+FORCE_IPV4_DNS=$(jq -r 'if .force_ipv4_dns == null then true else .force_ipv4_dns end' "$OPTIONS_FILE")
 ACCESS_MODE=$(jq -r '.access_mode // "custom"' "$OPTIONS_FILE")
 NGINX_LOG_LEVEL=$(jq -r '.nginx_log_level // "minimal"' "$OPTIONS_FILE")
-AUTO_CONFIGURE_MCP=$(jq -r '.auto_configure_mcp // false' "$OPTIONS_FILE")
+AUTO_CONFIGURE_MCP=$(jq -r 'if .auto_configure_mcp == null then false else .auto_configure_mcp end' "$OPTIONS_FILE")
 
 # mDNS/Bonjour configuration
 MDNS_MODE=$(jq -r '.mdns_mode // "minimal"' "$OPTIONS_FILE")
@@ -114,7 +114,7 @@ MDNS_INTERFACE_NAME=$(jq -r '.mdns_interface_name // ""' "$OPTIONS_FILE")
 # Gateway log-to-console option (read in Section 0, re-read for clarity)
 # Default: false — gateway logs go to /config/clawd/logs/gateway_startup.log only
 # When true: gateway output also visible on HA console (useful for debugging)
-GATEWAY_LOG_TO_CONSOLE=$(jq -r '.gateway_log_to_console // false' "$OPTIONS_FILE")
+GATEWAY_LOG_TO_CONSOLE=$(jq -r 'if .gateway_log_to_console == null then false else .gateway_log_to_console end' "$OPTIONS_FILE")
 
 # Gateway environment variables
 GW_ENV_VARS_TYPE=$(jq -r 'if .gateway_env_vars == null then "null" else (.gateway_env_vars | type) end' "$OPTIONS_FILE")
@@ -580,6 +580,13 @@ else
 fi
 
 echo "INFO: Section 13 done (gateway settings)"
+
+# ------------------------------------------------------------------------------
+# Section 13b: Ensure critical plugins (ollama for web search)
+# ------------------------------------------------------------------------------
+if [ -f "$HELPER_PATH" ] && [ -f "$OPENCLAW_CONFIG_PATH" ]; then
+  python3 "$HELPER_PATH" ensure-plugins 2>/dev/null || echo "WARN: ensure-plugins failed (non-fatal)"
+fi
 
 # ------------------------------------------------------------------------------
 # Section 14: TLS Certificate Generation (lan_https mode)

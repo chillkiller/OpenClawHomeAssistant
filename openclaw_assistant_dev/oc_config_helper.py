@@ -251,6 +251,42 @@ def cleanup_stale_config_keys():
     return False
 
 
+def ensure_plugins():
+    """Ensure critical plugins entries are preserved in config.
+
+    The gateway may remove or not write plugins.entries on config reload.
+    This function ensures that essential plugin entries (like ollama for web search)
+    are always present in the config.
+    """
+    cfg = read_config() or {}
+    plugins = cfg.setdefault("plugins", {})
+    entries = plugins.setdefault("entries", {})
+
+    # Required plugins that must always be present
+    required_plugins = {
+        "ollama": {"enabled": True}
+    }
+
+    changes = []
+    for plugin_id, plugin_config in required_plugins.items():
+        if plugin_id not in entries:
+            entries[plugin_id] = plugin_config
+            changes.append(f"plugins.entries.{plugin_id} -> added")
+        elif not entries[plugin_id].get("enabled", False):
+            entries[plugin_id]["enabled"] = True
+            changes.append(f"plugins.entries.{plugin_id}.enabled -> true")
+
+    if changes:
+        if write_config(cfg):
+            print(f"INFO: Ensured plugins: {', '.join(changes)}")
+            return True
+        print("ERROR: Failed to write config")
+        return False
+
+    print("INFO: Plugins already correct")
+    return True
+
+
 def generate_mdns_nginx_snippet(public_port: int, internal_port: int, host_name: str = ""):
     """
     Generate nginx config snippet for mDNS-aware HTTPS proxy.
@@ -283,6 +319,7 @@ def main():
         print("  get <key>")
         print("  set <key> <value>")
         print("  mdns-nginx-snippet <public_port> <internal_port> [hostname]")
+        print("  ensure-plugins")
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -353,6 +390,9 @@ def main():
         if snippet:
             print(snippet)
         sys.exit(0)
+
+    elif cmd == "ensure-plugins":
+        sys.exit(0 if ensure_plugins() else 1)
 
     elif cmd == "cleanup-stale-config":
         sys.exit(0 if cleanup_stale_config_keys() else 1)
