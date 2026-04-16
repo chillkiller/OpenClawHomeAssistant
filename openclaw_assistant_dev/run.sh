@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ==============================================================================
-# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.5)
+# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.6)
 # Best-of-All-Worlds: Trixie Full-Stack + coollabsio Persistence + techartdev HA-Integration
 # ==============================================================================
 
@@ -149,7 +149,8 @@ case "$ACCESS_MODE" in
     ENABLE_HTTPS_PROXY=true
     GATEWAY_INTERNAL_PORT=$((GATEWAY_PORT + 1))
     GATEWAY_TRUSTED_PROXIES="127.0.0.1"
-    echo "INFO: Access mode: lan_https (built-in HTTPS proxy on 0.0.0.0:${GATEWAY_PORT})"
+    CONTROLUI_DISABLE_DEVICE_AUTH=true
+    echo "INFO: Access mode: lan_https (built-in HTTPS proxy on 0.0.0.0:${GATEWAY_PORT}, device auth disabled for proxy)"
     ;;
   lan_reverse_proxy)
     GATEWAY_BIND_MODE="lan"
