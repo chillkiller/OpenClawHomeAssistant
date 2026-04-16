@@ -678,6 +678,17 @@ fi
 
 echo "INFO: Section 15 done (control UI origins)"
 
+# --- Control UI Debug Dump ---
+echo "DEBUG: access_mode=$ACCESS_MODE, ENABLE_HTTPS_PROXY=$ENABLE_HTTPS_PROXY"
+echo "DEBUG: CONTROLUI_DISABLE_DEVICE_AUTH=$CONTROLUI_DISABLE_DEVICE_AUTH"
+echo "DEBUG: GATEWAY_BIND_MODE=$GATEWAY_BIND_MODE, GATEWAY_PORT=$GATEWAY_PORT, GATEWAY_INTERNAL_PORT=$GATEWAY_INTERNAL_PORT"
+if [ -f "$OPENCLAW_CONFIG_PATH" ]; then
+  echo "DEBUG: controlUi=$(jq -c '.gateway.controlUi' "$OPENCLAW_CONFIG_PATH" 2>/dev/null || echo 'not readable')"
+  echo "DEBUG: gateway.bind=$(jq -r '.gateway.bind' "$OPENCLAW_CONFIG_PATH" 2>/dev/null || echo 'not readable')"
+  echo "DEBUG: gateway.port=$(jq -r '.gateway.port' "$OPENCLAW_CONFIG_PATH" 2>/dev/null || echo 'not readable')"
+  echo "DEBUG: gateway.auth.mode=$(jq -r '.gateway.auth.mode' "$OPENCLAW_CONFIG_PATH" 2>/dev/null || echo 'not readable')"
+fi
+
 # ------------------------------------------------------------------------------
 # Section 16: Proxy Shim
 # ------------------------------------------------------------------------------
