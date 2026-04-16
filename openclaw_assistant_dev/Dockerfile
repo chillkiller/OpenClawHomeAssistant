@@ -149,8 +149,9 @@ RUN mkdir -p /etc/apt/keyrings \
 # Installs to /opt/ms-playwright (inside the image, NOT /config which is runtime-only)
 # =============================================================================
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
-# Use uv to bypass PEP 668 (Debian Trixie blocks system-wide pip)
-RUN uv pip install --system playwright && \
+# PEP 668 blocks system-wide pip on Debian Trixie.
+# --break-system-packages is safe in a Docker image (no system to break).
+RUN uv pip install --system --break-system-packages playwright && \
     playwright install chromium --with-deps && \
     # Create symlinks for compatibility with scripts expecting chromium-browser
     ln -sf /opt/ms-playwright/chromium-*/chrome-linux/chrome /usr/bin/chromium-browser && \
