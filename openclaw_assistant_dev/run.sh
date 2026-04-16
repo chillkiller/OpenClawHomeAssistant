@@ -2,12 +2,14 @@
 set -euo pipefail
 
 # ==============================================================================
-# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.0)
+# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.1.0)
 # Best-of-All-Worlds: Trixie Full-Stack + coollabsio Persistence + techartdev HA-Integration
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Section 0: Log Rotation + Console Routing
+# Section 0: Log Rotation + Startup Trace File
+# Dev-addon only: log everything to file for debugging startup issues.
+# Console output is NOT touched — it flows naturally like the upstream repo.
 # ------------------------------------------------------------------------------
 LOG_DIR="/config/clawd/logs"
 mkdir -p "$LOG_DIR"
@@ -20,18 +22,9 @@ for log_file in "$LOG_DIR"/run_full_trace.log "$LOG_DIR"/gateway_startup.log; do
   fi
 done
 
-# Read log-to-console options early (OPTIONS_FILE defined below, but we need it now)
-OPTIONS_FILE_EARLY="/data/options.json"
-TRACE_LOG_TO_CONSOLE=$(jq -r '.trace_log_to_console // false' "$OPTIONS_FILE_EARLY" 2>/dev/null || echo false)
-GATEWAY_LOG_TO_CONSOLE=$(jq -r '.gateway_log_to_console // false' "$OPTIONS_FILE_EARLY" 2>/dev/null || echo false)
-
-if [ "$TRACE_LOG_TO_CONSOLE" = "true" ] || [ "$TRACE_LOG_TO_CONSOLE" = "1" ]; then
-  # Mirror trace to console AND file
-  exec > >(tee -a "$LOG_DIR/run_full_trace.log") 2>&1
-else
-  # Trace to file only (HA log window stays clean)
-  exec >> "$LOG_DIR/run_full_trace.log" 2>&1
-fi
+# Mirror all console output (stdout+stderr) to the trace log file.
+# The console itself is untouched — everything still shows up in the HA log window.
+exec > >(tee -a "$LOG_DIR/run_full_trace.log") 2>&1
 
 echo "=== RUN.SH START: $(date -Iseconds) ==="
 
@@ -103,9 +96,10 @@ MDNS_HOST_NAME=$(jq -r '.mdns_host_name // ""' "$OPTIONS_FILE")
 MDNS_SERVICE_PORT=$(jq -r '.mdns_service_port // "'"$GATEWAY_PORT"'"' "$OPTIONS_FILE")
 MDNS_INTERFACE_NAME=$(jq -r '.mdns_interface_name // ""' "$OPTIONS_FILE")
 
-# Log-to-console options (already read in Section 0, but re-read for clarity)
+# Gateway log-to-console option (read in Section 0, re-read for clarity)
+# Default: false — gateway logs go to /config/clawd/logs/gateway_startup.log only
+# When true: gateway output also visible on HA console (useful for debugging)
 GATEWAY_LOG_TO_CONSOLE=$(jq -r '.gateway_log_to_console // false' "$OPTIONS_FILE")
-TRACE_LOG_TO_CONSOLE=$(jq -r '.trace_log_to_console // false' "$OPTIONS_FILE")
 
 # Gateway environment variables
 GW_ENV_VARS_TYPE=$(jq -r 'if .gateway_env_vars == null then "null" else (.gateway_env_vars | type) end' "$OPTIONS_FILE")
@@ -732,10 +726,10 @@ PY
   else
     mkdir -p /config/clawd/logs
     if [ "$GATEWAY_LOG_TO_CONSOLE" = "true" ] || [ "$GATEWAY_LOG_TO_CONSOLE" = "1" ]; then
-      # Mirror gateway output to console AND file
+      # Gateway output to console AND file (useful for debugging)
       openclaw gateway run 2>&1 | tee -a /config/clawd/logs/gateway_startup.log &
     else
-      # Gateway output to file only (HA log window stays clean)
+      # Gateway output to file only (default — keeps HA console cleaner)
       openclaw gateway run > /config/clawd/logs/gateway_startup.log 2>&1 &
     fi
   fi

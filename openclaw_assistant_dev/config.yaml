@@ -1,4 +1,4 @@
-# OpenClaw Dev-Addon v0.7.0 Configuration
+# OpenClaw Dev-Addon v0.7.1.0 Configuration
 # BEST-OF-ALL-WORLDS BUILD: Trixie Full-Stack + coollabsio Persistence + techartdev HA-Integration
 # CHANGELOG v0.7.0:
 #   - Added mDNS configuration options for LAN discovery
@@ -6,7 +6,9 @@
 #   - Added custom init script option (coollabsio pattern)
 #   - Version bump to trigger HA rebuild
 name: OpenClaw Assistant (Dev)
-version: "0.7.1"
+version: "0.7.1.0"
+
+version: "0.7.1.0"
 slug: openclaw_assistant_dev
 description: OpenClaw Home Assistant Addon (Development Branch - Trixie Full-Stack)
 url: https://github.com/chillkiller/OpenClawHomeAssistant
@@ -108,10 +110,9 @@ options:
   mdns_interface_name: ""
 
   # Gateway log output: mirror gateway stdout/stderr to HA add-on log window
+  # When false (default), gateway logs go to /config/clawd/logs/gateway_startup.log only
+  # When true, gateway output also visible on HA console (useful for debugging)
   gateway_log_to_console: false
-
-  # Trace log output: mirror full boot trace (set -x) to HA add-on log window
-  trace_log_to_console: false
 
   # Environment variables to pass to the gateway process at startup.
   # Format: list of objects with name/value fields.
@@ -166,7 +167,6 @@ schema:
   mdns_service_port: int(1,65535)?
   mdns_interface_name: str?
   gateway_log_to_console: bool?
-  trace_log_to_console: bool?
   gateway_env_vars:
     - name: "match(^[A-Z_][A-Z0-9_]*$)"
       value: str
