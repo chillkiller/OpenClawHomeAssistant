@@ -30,8 +30,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/config
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
 ENV NODE_COMPILE_CACHE=/config/.node-compile-cache
 ENV CHROMIUM_CACHE=/tmp/openclaw/chromium_cache
 # Playwright browsers are installed to /opt/ms-playwright during build.
@@ -183,12 +181,8 @@ RUN useradd -m -s /bin/bash linuxbrew \
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
 ENV HOMEBREW_BREW_FILE="/home/linuxbrew/.linuxbrew/Homebrew"
 
-# =============================================================================
-# Chromium - OPTIONAL (check if really needed, 348MB)
-# If video processing is needed, keep. Otherwise can be removed.
-# =============================================================================
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+# Chromium is provided by Playwright (see above /opt/ms-playwright)
+# No separate apt install needed
 
 # =============================================================================
 # ttyd (web terminal) binary
@@ -204,8 +198,6 @@ RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch
 RUN npm install -g openclaw@2026.4.14 \
     && npm install -g pnpm \
     && npm cache clean --force
-
-RUN npm cache clean --force
 
 # Fix safe.directory
 RUN git config --global safe.directory /home/linuxbrew/.linuxbrew/Homebrew
