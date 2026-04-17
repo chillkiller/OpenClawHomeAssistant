@@ -4,6 +4,7 @@
 - **FIX:** `controlui_disable_device_auth` Default auf `false` (war `true`)
 - **FIX:** Dockerfile aufgeräumt (doppelte ENV, leerer apt-run, doppelter npm cache clean)
 - **FIX:** `ensure-plugins` in oc_config_helper.py sichert `plugins.entries.ollama`
+- **UPGRADE:** OpenClaw 2026.4.14 → 2026.4.15 (Security-Fix für dangerouslyDisableDeviceAuth-Patch-Blocking #62006, Tool-Name-Collision #67303, Webchat-Audio-Path #67298)
 - **FIX:** `build.yaml` entfernt (HA-supervisor-obsolet)
 - Repo aufgeräumt: Backup-Dateien, __pycache__ entfernt, .gitignore erweitert
 
