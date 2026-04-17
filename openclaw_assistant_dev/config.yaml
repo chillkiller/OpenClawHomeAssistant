@@ -83,7 +83,7 @@ options:
   gateway_additional_allowed_origins: ""
 
   # Disable per-device Control UI auth ceremony (avoids pairing error 1008 on LAN)
-  controlui_disable_device_auth: true
+  controlui_disable_device_auth: false
 
   # Enable OpenAI-compatible Chat Completions API endpoint (for HA Assist pipeline)
   enable_openai_api: false

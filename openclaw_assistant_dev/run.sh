@@ -149,8 +149,7 @@ case "$ACCESS_MODE" in
     ENABLE_HTTPS_PROXY=true
     GATEWAY_INTERNAL_PORT=$((GATEWAY_PORT + 1))
     GATEWAY_TRUSTED_PROXIES="127.0.0.1"
-    CONTROLUI_DISABLE_DEVICE_AUTH=true
-    echo "INFO: Access mode: lan_https (built-in HTTPS proxy on 0.0.0.0:${GATEWAY_PORT}, device auth disabled for proxy)"
+    echo "INFO: Access mode: lan_https (built-in HTTPS proxy on 0.0.0.0:${GATEWAY_PORT}, device auth from config)"
     ;;
   lan_reverse_proxy)
     GATEWAY_BIND_MODE="lan"
