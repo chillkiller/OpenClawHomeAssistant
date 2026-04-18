@@ -31,10 +31,15 @@ options:
   enable_terminal: true
   terminal_port: 7681
 
-  # Public base URL for opening the Gateway Web UI in a new tab (not embedded).
-  # Recommended: NO trailing slash.
-  # Example: "https://example.duckdns.org:12345" or "http://192.168.1.10:18789"
+  # Public base URL for reaching this gateway from the internet (DynDNS, etc.).
+  # Also used for allowedOrigins and TLS certificate SANs.
+  # NO trailing slash.
+  # LAN example: "https://192.168.1.10:18789"
+  # DynDNS example: "https://openclaw.example.com:18789"
   gateway_public_url: ""
+  # Public base URL for reaching this gateway from the internet (e.g. DynDNS).
+  # Used for: allowedOrigins + TLS certificate SANs.
+  # Example: "https://openclaw.example.com:18789"
 
   # Optional: Home Assistant long-lived token (for local HA API scripts/tools)
   homeassistant_token: ""
@@ -75,6 +80,10 @@ options:
   gateway_auth_mode: token
   gateway_trusted_proxies: ""
   gateway_additional_allowed_origins: ""
+  # Additional origins allowed by the Control UI (comma-separated).
+  # Needed for remote access via DynDNS or custom domain names.
+  # Also added to TLS certificate SANs automatically.
+  # Example: "openclaw.example.com,myserver.duckdns.org"
 
   # Disable per-device Control UI auth ceremony (avoids pairing error 1008 on LAN)
   controlui_disable_device_auth: false
@@ -93,7 +102,11 @@ options:
   # minimal: advertise gateway service (default)
   # full: verbose mDNS with all metadata
   mdns_mode: minimal
-  # Hostname to advertise (empty = auto-detect from HA hostname)
+  # Hostname for mDNS/Bonjour (empty = auto-detect).
+  # When set, this hostname is used for:
+  #   - mDNS advertisement (e.g. openclaw.local)
+  #   - Control UI allowedOrigins (e.g. https://openclaw.local:18789)
+  #   - TLS certificate SAN (DNS:openclaw.local)
   mdns_host_name: ""
   # Service port to advertise in mDNS (default: gateway_port)
   # IMPORTANT: In lan_https mode, this should match the public HTTPS port
