@@ -13,7 +13,7 @@ configuration:
   
   gateway_public_url:
     name: Öffentliche Gateway-URL
-    description: Öffentliche Basis-URL zum Öffnen der Gateway-Weboberfläche in einem neuen Tab (nicht eingebettet). Beispiel - https://meinserver.duckdns.org:12345 oder http://192.168.1.10:18789
+    description: Öffentliche URL für den Zugriff auf das Gateway aus dem Internet oder LAN (z.B. DynDNS). Wird für Control-UI-allowedOrigins und TLS-Zertifikat-SANs verwendet. Kein abschließender Schrägstrich. LAN-Beispiel - https://192.168.1.10:18789 — DynDNS-Beispiel - https://openclaw.example.com:18789
   
   homeassistant_token:
     name: Home Assistant Token
@@ -56,7 +56,7 @@ configuration:
 
   gateway_additional_allowed_origins:
     name: Zusätzliche erlaubte Origins
-    description: Kommagetrennte zusätzliche Control-UI-Origins, die bei lan_https in gateway.controlUi.allowedOrigins zusammengeführt werden (Beispiel - https://ha.example.com:8443,capacitor://localhost)
+    description: Kommagetrennte zusätzliche Control-UI-Origins für Fernzugriff (DynDNS, eigene Domains). Wird automatisch auch zu den TLS-Zertifikat-SANs hinzugefügt. Beispiel - openclaw.example.com,meinserver.duckdns.org
 
   controlui_disable_device_auth:
     name: Control-UI-Geräte-Pairing deaktivieren (lan_https)
@@ -120,7 +120,7 @@ configuration:
 
   mdns_host_name:
     name: mDNS-Hostname
-    description: Optionaler Hostname für mDNS-Advertisements (z.B. homeassistant.local). Wenn leer, wird der Container-Hostname automatisch erkannt.
+    description: Hostname für mDNS/Bonjour-Advertisement (z.B. openclaw → erreichbar als openclaw.local). Wird automatisch zu Control-UI-allowedOrigins und TLS-Zertifikat-SANs hinzugefügt. Wenn leer, wird der Container-Hostname automatisch erkannt.
 
   mdns_service_port:
     name: mDNS-Dienst-Port
