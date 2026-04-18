@@ -1,52 +1,52 @@
 # 📘 Project: Ultimate OpenClaw Dev-Addon (Sovereign Edition)
 
 ## 🎯 Vision
-Ein Home Assistant Addon, das OpenClaw in seiner maximalen Leistungsfähigkeit bereitstellt. Es ist **Hardware-aware**, **lokal-fokussiert** und dient als Brücke zu einer lokalen AI-Infrastruktur innerhalb von Home Assistant.
+A Home Assistant add-on that provides OpenClaw at its maximum capability. It is **hardware-aware**, **locally-focused**, and serves as a bridge to a local AI infrastructure within Home Assistant.
 
-## 🏗️ 1. Architektur-Konzept
+## 🏗️ 1. Architecture Concept
 
-### 🌍 Multi-Arch & Hardware-Strategie
-- **AMD64 (Powerhouse):** 
-  - Fokus auf Stabilität und Performance für lokale Orchestrierung.
-  - Keine GPU-Bibliotheken im Container – GPU-Arbeit läuft in separaten Addons.
-  - Unterstützt optionales ffmpeg-VAAPI-Encoding via `video: true`.
-- **aarch64 (Admin/Light):** 
-  - Fokus auf Stabilität und Management.
-  - Reine CPU-Inferenz und -Orchestrierung.
-  - Optimiert für Raspberry Pi / ARM-Server als Container-Host.
-- **ARMv7:** Support vollständig entfernt.
+### 🌍 Multi-Arch & Hardware Strategy
+- **AMD64 (Powerhouse):**
+  - Focus on stability and performance for local orchestration.
+  - No GPU libraries in the container — GPU workloads run in separate add-ons.
+  - Supports optional ffmpeg VAAPI encoding via `video: true`.
+- **aarch64 (Admin/Light):**
+  - Focus on stability and management.
+  - Pure CPU inference and orchestration.
+  - Optimized for Raspberry Pi / ARM servers as container hosts.
+- **ARMv7:** Support fully removed.
 
-### 📦 Dockerfile Layer-Structur (The Three Zones + Dev-Chain)
+### 📦 Dockerfile Layer Structure (The Three Zones + Dev-Chain)
 
-#### **Zone 1: Core-System (APT - Immutable)**
-*Die fundamentale Basis für alle Architekturen.*
-- **Media & Audio:** `ffmpeg`, `sox`, `libopus-dev`, `libvips-dev`, `espeak-ng` (Piper-Basis).
+#### **Zone 1: Core System (APT - Immutable)**
+*The fundamental base for all architectures.*
+- **Media & Audio:** `ffmpeg`, `sox`, `libopus-dev`, `libvips-dev`, `espeak-ng` (Piper base).
 - **Audio Processing:** `libsndfile1`, `libsamplerate0-dev`, `portaudio19-dev`, `libpulse-dev`, `libasound2-dev`
 - **GStreamer (STT):** `gstreamer1.0-plugins-base`, `gstreamer1.0-plugins-good`, `gstreamer1.0-tools`
-- **Memory & Math:** `liblapack3`, `libopenblas-dev` (für lokale Embeddings und BLAS).
-- **Knowledge-DB Client:** `libpq-dev`, `postgresql-client`, `python3-psycopg2` (Vorbereitung für pgvector).
+- **Memory & Math:** `liblapack3`, `libopenblas-dev` (for local embeddings and BLAS).
+- **Knowledge-DB Client:** `libpq-dev`, `postgresql-client`, `python3-psycopg2` (preparation for pgvector).
 - **Python Dev:** `python3-dev`, `python3-venv`, `build-essential`, `pkg-config`, `cmake`
-- **QMD Runtime:** `bun` (für QMD Memory Engine als Option)
+- **QMD Runtime:** `bun` (for QMD Memory Engine as an option)
 - **Tooling:** `tmux`, `ripgrep`, `jq`, `fd-find`, `curl`, `git`, `openssl`.
 
-#### **Zone 2: Hardware-Acceleration (ENTFERNT)**
-*OpenClaw selbst ist kein GPU-Worker – es orchestriert spezialisierte Addons.*
-- Keine GPU-Bibliotheken im Dockerfile nötig.
-- Optionales GPU-Feature: `video: true` in config.yaml für ffmpeg-VAAPI-Encoding (Nice-to-Have).
+#### **Zone 2: Hardware Acceleration (REMOVED)**
+*OpenClaw itself is not a GPU worker — it orchestrates specialized add-ons.*
+- No GPU libraries needed in the Dockerfile.
+- Optional GPU feature: `video: true` in config.yaml for ffmpeg VAAPI encoding (nice-to-have).
 
-#### **Zone 3: Dev-Toolchain & ML-Runtimes**
-*Werkzeuge zur Skill-Installation und Ausführung.*
-- **Node.js 22 LTS:** Die Basis für OpenClaw.
-- **Python 3.11+ & uv:** High-Performance Package Manager for ML-Skills.
-- **Homebrew (Linuxbrew):** For CLI-Tools like `gh`, `openhye` etc.
-- **Go-Compiler:** Integrated to build Go-based skills natively in the image.
+#### **Zone 3: Dev Toolchain & ML Runtimes**
+*Tools for skill installation and execution.*
+- **Node.js 22 LTS:** The foundation for OpenClaw.
+- **Python 3.11+ & uv:** High-performance package manager for ML skills.
+- **Homebrew (Linuxbrew):** For CLI tools like `gh`, `openhye`, etc.
+- **Go Compiler:** Integrated to build Go-based skills natively in the image.
 - **Bun Runtime:** For QMD Memory Engine and other JS tooling.
 
-## 🎙️ 2. Lokale Medien- & AI-Infrastruktur
+## 🎙️ 2. Local Media & AI Infrastructure
 
-The addon is not an "all-in-one" box, but an **orchestrator**. The heavy ML-runtimes run as separate HA-addons or containers, and the OpenClaw-addon provides the bridge:
+The add-on is not an "all-in-one" box, but an **orchestrator**. The heavy ML runtimes run as separate HA add-ons or containers, and the OpenClaw add-on provides the bridge:
 
-| Feature | Local Service (Separate Addon) | Bridge in OpenClaw-Addon |
+| Feature | Local Service (Separate Add-on) | Bridge in OpenClaw Add-on |
 |---|---|---|
 | **Text → Speech** | Piper / Kokoro Server | ✓ `espeak-ng` + `ffmpeg` |
 | **Speech → Text** | faster-whisper / whisper.cpp | ✓ `gstreamer` + `ffmpeg` |
@@ -54,12 +54,12 @@ The addon is not an "all-in-one" box, but an **orchestrator**. The heavy ML-runt
 | **Knowledge/Vector** | PostgreSQL + pgvector / Qdrant | ✓ `libpq` + `psql` Client |
 | **LLM Inference** | Ollama Server | ✓ HTTP API (`http://host:11434`) |
 
-## 🔐 3. Sicherheitskonzept
+## 🔐 3. Security Concept
 
 ### **No Privileged Mode**
 - OpenClaw uses **no** `privileged: true` in config.yaml.
-- GPU access is only via optional `video: true` (for ffmpeg-VAAPI).
-- Heavy ML workloads run in sandboxed, separate addons with their own security concepts.
+- GPU access is only via optional `video: true` (for ffmpeg VAAPI).
+- Heavy ML workloads run in sandboxed, separate add-ons with their own security concepts.
 
 ### **Groups Instead of Privileges**
 Instead of `privileged: true`, use specific groups for hardware access:
@@ -71,18 +71,18 @@ groups:
   - tty          # for serial devices in some skills
 ```
 
-## ⚙️ 4. config.yaml - OpenClaw-Spezifische Options
+## ⚙️ 4. config.yaml — OpenClaw-Specific Options
 
 ```yaml
 options:
-  # GPU (optional, only for ffmpeg-VAAPI)
+  # GPU (optional, only for ffmpeg VAAPI)
   video: true                   # Enables /dev/dri access for VAAPI
 
   # Local ML Endpoints
   ollama_url: "http://host.homeassistant:11434"
   comfyui_url: "http://host.homeassistant:8188"
   
-  # PostgreSQL Knowledge-Base
+  # PostgreSQL Knowledge Base
   postgres_host: "host.homeassistant"
   postgres_port: 5432
   postgres_database: "openclaw"
@@ -106,47 +106,38 @@ options:
   # ... (other HA options as usual)
 ```
 
-## 💾 5. Persistenzkonzeption (HA-konform)
+## 💾 5. Persistence Design (HA-Compliant)
 
 - **`/config`**: Main configuration, API keys, user-defined models
   - Automatically mapped via HassIO Config Volume
   - Example: Ollama models, OpenClaw skills, configurations
 - **`/data`**: Runtime data, cache, logs, databases
-  - Persistent storage in the addon container
+  - Persistent storage in the add-on container
   - Example: Model caches, chat logs, log files
 - **`/share`**: Shared, infrequently changing data
   - Example: Large pretrained models (if user-provided)
 
-## 🚀 6. Implementierungs-Phasen (aktualisiert)
+## 🚀 6. Implementation Phases (Updated)
 
 ### **Phase 1: The Foundation (Hardware & Core)**
 - [x] **Dockerfile 1.0:** Zone 1 with complete APT packages (including voice/media gaps and Bun)
-- [x] **Zone 2 removed:** No GPU libs needed – `video: true` suffices
+- [x] **Zone 2 removed:** No GPU libs needed — `video: true` suffices
 - [x] **HA Config:** config.yaml with `video: true` and ML-endpoint options
 - [ ] **Disk Cleanup:** Free up space on SD card/host (if needed)
 
-## 🚀 6. Implementierungs-Phasen (aktualisiert)
-
-### **Phase 1: The Foundation (Hardware & Core)**
-- [x] **Dockerfile 1.0:** Zone 1 with complete APT packages (including voice/media gaps and Bun)
-- [x] **Zone 2 removed:** No GPU libs needed – `video: true` suffices
-- [x] **HA Config:** config.yaml with `video: true` and ML-endpoint options
-- [ ] **Disk Cleanup:** Free up space on SD card/host (if needed)
-
-### **Phase 2: The Dev-Power (Toolchains) & Space Optimization**
+### **Phase 2: The Dev Power (Toolchains) & Space Optimization**
 - [ ] **Node/Brew Setup:** Stable base for skill management.
-- [ ] **Multi-Stage Build Implementation:** 
+- [ ] **Multi-Stage Build Implementation:**
   - Mandatory separation of `Build-Stage` and `Runtime-Stage`.
   - Heavy toolchains (gcc, cmake, dev-headers) stay in Build-Stage.
   - Only final binaries and runtime libs are copied to the final image.
 - [ ] **Layer Hygiene:** Strict requirement to combine `apt-get install` and `rm -rf /var/lib/apt/lists/*` in a single layer to prevent invisible bloat.
-- [ ] **Sovereign Build-Flow:** Manage build cache to prevent "no space left on device" during layer extraction on SD cards.
+- [ ] **Sovereign Build Flow:** Manage build cache to prevent "no space left on device" during layer extraction on SD cards.
 - [ ] **Go Integration:** Compiler setup for native Go skills.
 - [ ] **Python/uv Optimization:** Setup for fast installation of ML skills.
 - [ ] **Bun Setup:** Installation and test of QMD.
 
-
-### **Phase 3: The Knowledge-Base (Data Layer)**
+### **Phase 3: The Knowledge Base (Data Layer)**
 - [ ] **Postgres Integration:** Client tools for pgvector connection
 - [ ] **Vector Sourcing:** Optimization of `libopenblas` for local embeddings
 - [ ] **Connectivity Test:** Connection to external DB containers test
@@ -156,18 +147,18 @@ options:
 - [ ] **Auto-Config:** Integration of `oc_config_helper.py`
 - [ ] **The Sovereign Guide:** Final handbook for the user
 
-## 📝 7. Kritische Notizen (aus allen Reviews)
+## 📝 7. Critical Notes (From All Reviews)
 
 - **Security:** No `privileged: true`. GPU only via optional `video: true`.
-- **Model Persistence:** All ML models stored in `/config` or `/data` – **never** in the image.
+- **Model Persistence:** All ML models stored in `/config` or `/data` — **never** in the image.
 - **Sovereignty:** Goal is full independence from cloud APIs. Cloud = optional fallback.
-- **ARMv7:** Support removed – no longer supported by HA.
-- **Base Image:** `ghcr.io/homeassistant/{arch}-base:latest` (Alpine-based like Sanctuary Addons).
+- **ARMv7:** Support removed — no longer supported by HA.
+- **Base Image:** `ghcr.io/homeassistant/{arch}-base:latest` (Alpine-based like Sanctuary Add-ons).
 - **QMD:** Available via `bun install -g @tobilu/qmd` (models land in `/config`).
 
-## 🔮 Zukünftige Hardware-Integration (vorgebaut)
+## 🔮 Future Hardware Integration (Pre-Wired)
 
-The following device mappings are **pre-wired** for future OpenClaw features (like Dreaming, Memory-Wiki, Active Memory Plugin, or extended camera integration). They are **disabled by default** – to enable, simply uncomment the corresponding lines in `config.yaml` and set `video: true`.
+The following device mappings are **pre-wired** for future OpenClaw features (like Dreaming, Memory-Wiki, Active Memory Plugin, or extended camera integration). They are **disabled by default** — to enable, simply uncomment the corresponding lines in `config.yaml` and set `video: true`.
 
 ```yaml
 # ============================================
@@ -175,7 +166,7 @@ The following device mappings are **pre-wired** for future OpenClaw features (li
 # ============================================
 # To enable: uncomment line and set video: true
 #
-# FOR VAAPI/VIDEO-ENCODING (ffmpeg Hardware Acceleration):
+# FOR VAAPI/VIDEO ENCODING (ffmpeg Hardware Acceleration):
 #   video: true                          # Sufficient for /dev/dri access
 #
 # FOR AMD ROCm (future GPU inference in container):
@@ -198,7 +189,7 @@ The following device mappings are **pre-wired** for future OpenClaw features (li
 #     - /dev/hailo1:/dev/hailo1          # Second Hailo-8
 #     - /dev/hailo2:/dev/hailo2          # Third Hailo-8 (if present)
 #
-# FOR VIDEO-CAPTURE (future camera integration):
+# FOR VIDEO CAPTURE (future camera integration):
 #   devices:
 #     - /dev/video0:/dev/video0          # USB Webcam
 #     - /dev/video1:/dev/video1          # Second Camera
@@ -210,12 +201,12 @@ The following device mappings are **pre-wired** for future OpenClaw features (li
 #     - /dev/snd/controlC0:/dev/snd/controlC0  # First Soundcard Controller
 ```
 
-> **Note:** The above mappings assume the corresponding drivers are present in the **Host Kernel** (Home Assistant OS) or via a HassOS-fork (e.g., Sanctuary Systems). OpenClaw itself requires no kernel drivers in the container – only userspace access via the devices.
+> **Note:** The above mappings assume the corresponding drivers are present in the **Host Kernel** (Home Assistant OS) or via a HassOS fork (e.g., Sanctuary Systems). OpenClaw itself requires no kernel drivers in the container — only userspace access via the devices.
 
-This framework allows the addon to grow over time – without changing the base structure. Simply uncomment, rebuild, and the new hardware is ready.
+This framework allows the add-on to grow over time — without changing the base structure. Simply uncomment, rebuild, and the new hardware is ready.
 
 ## 📜 Update: 2026-04-10 15:21 — Sovereign Fix
-Based on live diagnosis of mDNS hell, LLMs timeout, and proxy chain.
+Based on live diagnosis of mDNS hell, LLM timeouts, and proxy chain.
 
 ### 🔑 Key Fixes
 1. **mDNS Must Advertise Correct Port**
