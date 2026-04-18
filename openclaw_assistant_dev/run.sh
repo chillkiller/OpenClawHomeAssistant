@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ==============================================================================
-# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.5)
+# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.5.1)
 # Best-of-All-Worlds: Trixie Full-Stack + coollabsio Persistence + techartdev HA-Integration
 # ==============================================================================
 
@@ -641,7 +641,7 @@ PY
     openssl req -new -key "$CERT_DIR/gateway.key" -out "$CERT_DIR/gateway.csr" \
       -subj "/CN=OpenClaw Gateway" 2>/dev/null
     cat > "$CERT_DIR/_san.ext" <<SANEOF
-subjectAltName=IP:${LAN_IP:-127.0.0.1},IP:127.0.0.1,DNS:localhost,DNS:homeassistant,DNS:homeassistant.local${EXTRA_SANS:+,${EXTRA_SANS}}
+subjectAltName=IP:${LAN_IP:-127.0.0.1},IP:127.0.0.1,DNS:localhost,DNS:homeassistant,DNS:homeassistant.local${MDNS_HOST_NAME:+,DNS:${MDNS_HOST_NAME}.local}${EXTRA_SANS:+,${EXTRA_SANS}}
 SANEOF
     openssl x509 -req -in "$CERT_DIR/gateway.csr" \
       -CA "$CERT_DIR/ca.crt" -CAkey "$CERT_DIR/ca.key" -CAcreateserial \
@@ -667,6 +667,10 @@ if [ -f "$HELPER_PATH" ] && [ -f "$OPENCLAW_CONFIG_PATH" ]; then
   ALLOWED_ORIGINS=""
   if [ "$ENABLE_HTTPS_PROXY" = "true" ] && [ -n "$LAN_IP" ]; then
     ALLOWED_ORIGINS="https://${LAN_IP}:${GATEWAY_PORT},https://homeassistant.local:${GATEWAY_PORT},https://homeassistant:${GATEWAY_PORT}"
+    # Add mDNS hostname to allowed origins if configured
+    if [ -n "$MDNS_HOST_NAME" ]; then
+      ALLOWED_ORIGINS="${ALLOWED_ORIGINS},https://${MDNS_HOST_NAME}.local:${GATEWAY_PORT}"
+    fi
   fi
   GW_PUBLIC_ORIGIN=""
   if [ -n "$GW_PUBLIC_URL" ]; then
@@ -966,6 +970,37 @@ echo "INFO: Section 22 done (nginx started)"
 # Section 23: mDNS / Avahi Configuration
 # ------------------------------------------------------------------------------
 if [ "$MDNS_MODE" != "off" ]; then
+  # Start D-Bus system bus (required by avahi-daemon in containers)
+  if ! pgrep dbus-daemon >/dev/null 2>&1; then
+    if command -v dbus-daemon >/dev/null 2>&1; then
+      mkdir -p /run/dbus
+      dbus-daemon --system --fork 2>/dev/null || echo "WARN: dbus-daemon failed to start"
+      sleep 1
+      if [ -S /run/dbus/system_bus_socket ]; then
+        echo "INFO: D-Bus system bus started"
+      else
+        echo "WARN: D-Bus socket not found after start"
+      fi
+    else
+      echo "WARN: dbus-daemon not installed; avahi may fail to start"
+    fi
+  else
+    echo "INFO: D-Bus system bus already running"
+  fi
+
+  # Set hostname for mDNS if MDNS_HOST_NAME is configured
+  if [ -n "$MDNS_HOST_NAME" ]; then
+    hostname "$MDNS_HOST_NAME" 2>/dev/null || true
+    echo "$MDNS_HOST_NAME" > /etc/hostname
+    # Add .local entry to avahi hosts file for proper resolution
+    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    if [ -n "$LAN_IP" ]; then
+      grep -q "$MDNS_HOST_NAME.local" /etc/avahi/hosts 2>/dev/null || \
+        echo "$LAN_IP $MDNS_HOST_NAME.local" >> /etc/avahi/hosts
+    fi
+    echo "INFO: Hostname set to $MDNS_HOST_NAME for mDNS"
+  fi
+
   # Start avahi-daemon if available
   if command -v avahi-daemon >/dev/null 2>&1; then
     if ! pgrep avahi-daemon >/dev/null 2>&1; then
@@ -1008,6 +1043,8 @@ AVAHI_CONF
   MDNS_HOSTNAME="${MDNS_HOST_NAME:-$(hostname -f 2>/dev/null || hostname)}"
   MDNS_PORT="${MDNS_SERVICE_PORT:-$GATEWAY_PORT}"
   if [ "$ENABLE_HTTPS_PROXY" = "true" ]; then
+    # In HTTPS mode, mDNS must advertise GATEWAY_PORT (the public HTTPS port, e.g. 18789)
+    # NOT NGINX_PORT (which is the Ingress port 48099)
     MDNS_PORT="$GATEWAY_PORT"
     echo "INFO: mDNS advertising public HTTPS port $MDNS_PORT"
   fi
