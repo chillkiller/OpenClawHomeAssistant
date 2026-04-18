@@ -201,28 +201,32 @@ def set_mdns_settings(
     """
     Configure mDNS/Bonjour discovery for the gateway.
 
-    OpenClaw 2026.4.10+ handles mDNS internally (discovery.mDNS is deprecated in config).
-    Writing it to openclaw.json causes "Unrecognized key: mDNS" errors.
+    When mdns_mode is 'off', explicitly sets discovery.mdns.mode='off' in config
+    and exports OPENCLAW_DISABLE_BONJOUR=1 to stop the built-in Bonjour advertiser.
 
-    Instead, this function:
-    1. Logs the requested mDNS settings
-    2. Generates nginx config snippets for mDNS-aware proxying (if lan_https mode)
-    3. Returns success without touching openclaw.json
-
-    The gateway handles mDNS discovery based on gateway.bind mode internally.
-    For lan_https mode, the SOVEREIGN mDNS FIX ensures the nginx HTTPS port
-    is advertised instead of the internal gateway port.
+    For other modes, Avahi handles mDNS at the OS level and the built-in
+    Bonjour advertiser MUST be disabled to avoid the probing loop conflict.
     """
+    cfg = read_config() or {}
+
+    # Always disable built-in Bonjour — Avahi handles mDNS when enabled,
+    # and when mDNS is off, we don't want Bonjour at all.
+    cfg.setdefault("discovery", {})
+    cfg["discovery"]["mdns"] = {"mode": "off"}
+
+    if write_config(cfg):
+        print(f"INFO: Set discovery.mdns.mode=off in config (Bonjour advertiser disabled)")
+    else:
+        print("WARN: Failed to write discovery.mdns.mode to config")
+
     if mode == "off":
         print("INFO: mDNS disabled (mode=off)")
         return True
 
     print(f"INFO: mDNS requested (mode={mode}, port={service_port})")
-    print("INFO: mDNS is handled internally by the gateway (discovery.mDNS deprecated in config)")
+    print("INFO: Built-in Bonjour disabled — Avahi handles mDNS at OS level")
     print("INFO: Ensure gateway.bind is 'lan' or 'tailnet' for LAN discovery")
-    print(f"INFO: In lan_https mode, nginx will proxy port {service_port} -> internal gateway")
 
-    # DO NOT write discovery.mDNS to config — it's deprecated and causes errors
     return True
 
 
@@ -234,9 +238,11 @@ def cleanup_stale_config_keys():
 
     changes = []
     if "discovery" in cfg:
+        # Remove deprecated uppercase mDNS key (OpenClaw uses lowercase mdns)
         if "mDNS" in cfg["discovery"]:
             del cfg["discovery"]["mDNS"]
-            changes.append("removed deprecated discovery.mDNS")
+            changes.append("removed deprecated discovery.mDNS (uppercase)")
+        # Keep lowercase discovery.mdns — we write it to disable Bonjour
         if not cfg["discovery"]:
             del cfg["discovery"]
             changes.append("removed empty discovery section")

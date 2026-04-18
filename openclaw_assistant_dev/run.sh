@@ -129,8 +129,10 @@ CUSTOM_INIT_SCRIPT=$(jq -r '.custom_init_script // empty' "$OPTIONS_FILE")
 
 export TZ="$TZNAME"
 
-if [ "$MDNS_MODE" != "off" ]; then
-fi
+# Always disable built-in Bonjour advertiser — it conflicts with Avahi
+# and causes infinite probing loops in containers. Avahi or nothing.
+export OPENCLAW_DISABLE_BONJOUR=1
+
 
 echo "INFO: Options loaded (timezone=$TZNAME, gateway_mode=$GATEWAY_MODE, access_mode=$ACCESS_MODE)"
 
@@ -972,7 +974,6 @@ echo "INFO: Section 22 done (nginx started)"
 # ------------------------------------------------------------------------------
 # Section 23: mDNS / Avahi Configuration
 # ------------------------------------------------------------------------------
-if [ "$MDNS_MODE" != "off" ]; then
   # Start D-Bus system bus (required by avahi-daemon in containers)
   if ! pgrep dbus-daemon >/dev/null 2>&1; then
     if command -v dbus-daemon >/dev/null 2>&1; then
@@ -1070,7 +1071,6 @@ AVAHI_CONF
   fi
 else
   echo "INFO: mDNS mode is off; skipping avahi and mDNS configuration"
-fi
 
 echo "INFO: Section 23 done (mDNS/avahi)"
 # ------------------------------------------------------------------------------

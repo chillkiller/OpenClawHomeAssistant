@@ -1,9 +1,12 @@
 # Changelog — OpenClaw Assistant (Dev)
 
 ## [0.7.5.2] - 2026-04-19
-- **CRITICAL FIX:** Removed `OPENCLAW_DISABLE_BONJOUR=1` — caused Bonjour/mDNS probing loop that spammed logs and destabilized gateway (Bonjour built-in fought with Avahi, neither won)
-- **CRITICAL FIX:** Removed `hostname` and `/etc/hostname` override — changing container hostname breaks HA Supervisor health checks and violates the "never modify container files" rule
-- **FIX:** Removed duplicate `LAN_IP` assignment in mDNS section (already set in TLS section)
+- **CRITICAL FIX:** Always set `OPENCLAW_DISABLE_BONJOUR=1` — built-in Bonjour causes infinite probing loops in containers (cannot reach mDNS multicast on loopback)
+- **CRITICAL FIX:** `set_mdns_settings()` now writes `discovery.mdns.mode: "off"` to openclaw.json (stops Bonjour advertiser at gateway level, prevents log spam)
+- **CRITICAL FIX:** Removed `hostname` and `/etc/hostname` override — changing container hostname breaks HA Supervisor health checks
+- **CRITICAL FIX:** Removed Dev-Marvin's `OPENCLAW_DISABLE_BONJOUR=1` from mdns_mode block (was conditional, must be unconditional)
+- **FIX:** `cleanup_stale_config_keys()` preserves lowercase `discovery.mdns` (only removes uppercase `mDNS`)
+- **FIX:** Removed duplicate `LAN_IP` assignment in mDNS section
 - **FIX:** Removed duplicate `gateway_public_url` comment block in config.yaml
 
 ## [0.7.5.1] - 2026-04-18
