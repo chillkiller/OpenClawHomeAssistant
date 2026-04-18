@@ -1,5 +1,11 @@
 # Changelog — OpenClaw Assistant (Dev)
 
+## [0.7.5.2] - 2026-04-19
+- **CRITICAL FIX:** Removed `OPENCLAW_DISABLE_BONJOUR=1` — caused Bonjour/mDNS probing loop that spammed logs and destabilized gateway (Bonjour built-in fought with Avahi, neither won)
+- **CRITICAL FIX:** Removed `hostname` and `/etc/hostname` override — changing container hostname breaks HA Supervisor health checks and violates the "never modify container files" rule
+- **FIX:** Removed duplicate `LAN_IP` assignment in mDNS section (already set in TLS section)
+- **FIX:** Removed duplicate `gateway_public_url` comment block in config.yaml
+
 ## [0.7.5.1] - 2026-04-18
 - **FIX:** D-Bus system bus is now started before Avahi (containers lack systemd, so `run.sh` must start D-Bus explicitly — without it, Avahi exits silently)
 - **FIX:** `allowedOrigins` is dynamically extended with `${mdns_host_name}.local` when `mdns_host_name` is configured (fixes "origin not allowed" when accessing via mDNS hostname)

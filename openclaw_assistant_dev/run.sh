@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ==============================================================================
-# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.5.1)
+# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.5.2)
 # Best-of-All-Worlds: Trixie Full-Stack + coollabsio Persistence + techartdev HA-Integration
 # ==============================================================================
 
@@ -129,11 +129,7 @@ CUSTOM_INIT_SCRIPT=$(jq -r '.custom_init_script // empty' "$OPTIONS_FILE")
 
 export TZ="$TZNAME"
 
-# When mDNS/Avahi handles service discovery at the OS level,
-# disable OpenClaw's built-in Bonjour/Zeroconf to avoid duplicate advertisements.
 if [ "$MDNS_MODE" != "off" ]; then
-  export OPENCLAW_DISABLE_BONJOUR=1
-  echo "INFO: OPENCLAW_DISABLE_BONJOUR=1 (Avahi handles mDNS at OS level)"
 fi
 
 echo "INFO: Options loaded (timezone=$TZNAME, gateway_mode=$GATEWAY_MODE, access_mode=$ACCESS_MODE)"
@@ -995,17 +991,13 @@ if [ "$MDNS_MODE" != "off" ]; then
     echo "INFO: D-Bus system bus already running"
   fi
 
-  # Set hostname for mDNS if MDNS_HOST_NAME is configured
   if [ -n "$MDNS_HOST_NAME" ]; then
-    hostname "$MDNS_HOST_NAME" 2>/dev/null || true
-    echo "$MDNS_HOST_NAME" > /etc/hostname
     # Add .local entry to avahi hosts file for proper resolution
-    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
     if [ -n "$LAN_IP" ]; then
       grep -q "$MDNS_HOST_NAME.local" /etc/avahi/hosts 2>/dev/null || \
         echo "$LAN_IP $MDNS_HOST_NAME.local" >> /etc/avahi/hosts
     fi
-    echo "INFO: Hostname set to $MDNS_HOST_NAME for mDNS"
+    echo "INFO: mDNS hostname $MDNS_HOST_NAME configured (avahi hosts)"
   fi
 
   # Start avahi-daemon if available
