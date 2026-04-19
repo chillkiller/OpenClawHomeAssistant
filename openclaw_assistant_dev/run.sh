@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ==============================================================================
-# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.5.2)
+# OpenClaw Home Assistant Dev-Addon run.sh (v0.7.5.1)
 # Best-of-All-Worlds: Trixie Full-Stack + coollabsio Persistence + techartdev HA-Integration
 # ==============================================================================
 
@@ -129,10 +129,9 @@ CUSTOM_INIT_SCRIPT=$(jq -r '.custom_init_script // empty' "$OPTIONS_FILE")
 
 export TZ="$TZNAME"
 
-# Always disable built-in Bonjour advertiser — it conflicts with Avahi
-# and causes infinite probing loops in containers. Avahi or nothing.
+# Disable built-in Bonjour advertiser — causes probing loops in containers.
+# Avahi handles mDNS at OS level when enabled.
 export OPENCLAW_DISABLE_BONJOUR=1
-
 
 echo "INFO: Options loaded (timezone=$TZNAME, gateway_mode=$GATEWAY_MODE, access_mode=$ACCESS_MODE)"
 
@@ -974,6 +973,7 @@ echo "INFO: Section 22 done (nginx started)"
 # ------------------------------------------------------------------------------
 # Section 23: mDNS / Avahi Configuration
 # ------------------------------------------------------------------------------
+if [ "$MDNS_MODE" != "off" ]; then
   # Start D-Bus system bus (required by avahi-daemon in containers)
   if ! pgrep dbus-daemon >/dev/null 2>&1; then
     if command -v dbus-daemon >/dev/null 2>&1; then
@@ -992,13 +992,15 @@ echo "INFO: Section 22 done (nginx started)"
     echo "INFO: D-Bus system bus already running"
   fi
 
+  # Add .local entry to avahi hosts if MDNS_HOST_NAME is configured
   if [ -n "$MDNS_HOST_NAME" ]; then
     # Add .local entry to avahi hosts file for proper resolution
+    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
     if [ -n "$LAN_IP" ]; then
       grep -q "$MDNS_HOST_NAME.local" /etc/avahi/hosts 2>/dev/null || \
         echo "$LAN_IP $MDNS_HOST_NAME.local" >> /etc/avahi/hosts
     fi
-    echo "INFO: mDNS hostname $MDNS_HOST_NAME configured (avahi hosts)"
+    echo "INFO: Hostname set to $MDNS_HOST_NAME for mDNS"
   fi
 
   # Start avahi-daemon if available
@@ -1071,6 +1073,7 @@ AVAHI_CONF
   fi
 else
   echo "INFO: mDNS mode is off; skipping avahi and mDNS configuration"
+fi
 
 echo "INFO: Section 23 done (mDNS/avahi)"
 # ------------------------------------------------------------------------------

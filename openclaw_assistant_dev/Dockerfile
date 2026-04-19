@@ -1,4 +1,4 @@
-# Dockerfile for OpenClaw Dev-Addon v0.7.5
+# Dockerfile for OpenClaw Dev-Addon v0.7.5.1
 # Multi-stage build for disk space optimization
 # FIXED: Version bump to trigger HA update (HA ignored 0.6.1.4, last broken was 0.6.1.12)
 # FIXED: Added sudo package, HEALTHCHECK for HA Watchdog, run.sh root-safety
@@ -193,7 +193,7 @@ RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch
     && chmod +x /usr/local/bin/ttyd
 
 # =============================================================================
-# Install OpenClaw v0.7.6 (pinned version)
+# Install OpenClaw v0.7.5.1 (pinned version)
 # =============================================================================
 RUN npm install -g openclaw@2026.4.15 \
     && npm install -g pnpm \

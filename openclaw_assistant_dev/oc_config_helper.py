@@ -201,21 +201,19 @@ def set_mdns_settings(
     """
     Configure mDNS/Bonjour discovery for the gateway.
 
-    When mdns_mode is 'off', explicitly sets discovery.mdns.mode='off' in config
-    and exports OPENCLAW_DISABLE_BONJOUR=1 to stop the built-in Bonjour advertiser.
-
-    For other modes, Avahi handles mDNS at the OS level and the built-in
-    Bonjour advertiser MUST be disabled to avoid the probing loop conflict.
+    Always writes discovery.mdns.mode='off' to config to disable the built-in
+    Bonjour advertiser (causes infinite probing loops in loopback-bound containers).
+    Avahi handles mDNS at the OS level when mdns_mode is not 'off'.
     """
     cfg = read_config() or {}
 
-    # Always disable built-in Bonjour — Avahi handles mDNS when enabled,
-    # and when mDNS is off, we don't want Bonjour at all.
+    # Always disable built-in Bonjour — it conflicts with Avahi and
+    # cannot reach mDNS multicast groups in loopback-bound containers.
     cfg.setdefault("discovery", {})
     cfg["discovery"]["mdns"] = {"mode": "off"}
 
     if write_config(cfg):
-        print(f"INFO: Set discovery.mdns.mode=off in config (Bonjour advertiser disabled)")
+        print("INFO: Set discovery.mdns.mode=off in config (Bonjour advertiser disabled)")
     else:
         print("WARN: Failed to write discovery.mdns.mode to config")
 

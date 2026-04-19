@@ -1,6 +1,12 @@
-# OpenClaw Dev-Addon
+# OpenClaw Dev-Addon v0.7.5 Configuration
+# BEST-OF-ALL-WORLDS BUILD: Trixie Full-Stack + coollabsio Persistence + techartdev HA-Integration
+# CHANGELOG v0.7.0:
+#   - Added mDNS configuration options for LAN discovery
+#   - Added runtime apt packages option (coollabsio pattern)
+#   - Added custom init script option (coollabsio pattern)
+#   - Version bump to trigger HA rebuild
 name: OpenClaw Assistant (Dev)
-version: "0.7.5.2"
+version: "0.7.5.1"
 slug: openclaw_assistant_dev
 description: OpenClaw Home Assistant Addon (Development Branch - Trixie Full-Stack)
 url: https://github.com/chillkiller/OpenClawHomeAssistant
@@ -31,10 +37,9 @@ options:
   enable_terminal: true
   terminal_port: 7681
 
-  # Public base URL for reaching this gateway (LAN or DynDNS).
-  # Also used for allowedOrigins and TLS certificate SANs.
-  # NO trailing slash.
-  # LAN: "https://192.168.1.10:18789" | DynDNS: "https://openclaw.example.com:18789"
+  # Public base URL for opening the Gateway Web UI in a new tab (not embedded).
+  # Recommended: NO trailing slash.
+  # Example: "https://example.duckdns.org:12345" or "http://192.168.1.10:18789"
   gateway_public_url: ""
 
   # Optional: Home Assistant long-lived token (for local HA API scripts/tools)
@@ -76,10 +81,6 @@ options:
   gateway_auth_mode: token
   gateway_trusted_proxies: ""
   gateway_additional_allowed_origins: ""
-  # Additional origins allowed by the Control UI (comma-separated).
-  # Needed for remote access via DynDNS or custom domain names.
-  # Also added to TLS certificate SANs automatically.
-  # Example: "openclaw.example.com,myserver.duckdns.org"
 
   # Disable per-device Control UI auth ceremony (avoids pairing error 1008 on LAN)
   controlui_disable_device_auth: false
@@ -98,11 +99,7 @@ options:
   # minimal: advertise gateway service (default)
   # full: verbose mDNS with all metadata
   mdns_mode: minimal
-  # Hostname for mDNS/Bonjour (empty = auto-detect).
-  # When set, this hostname is used for:
-  #   - mDNS advertisement (e.g. openclaw.local)
-  #   - Control UI allowedOrigins (e.g. https://openclaw.local:18789)
-  #   - TLS certificate SAN (DNS:openclaw.local)
+  # Hostname to advertise (empty = auto-detect from HA hostname)
   mdns_host_name: ""
   # Service port to advertise in mDNS (default: gateway_port)
   # IMPORTANT: In lan_https mode, this should match the public HTTPS port
