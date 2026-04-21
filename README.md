@@ -171,10 +171,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [OpenClaw](https://github.com/openclaw/openclaw) - The core agentic AI platform
 - [Home Assistant](https://www.home-assistant.io/) - The amazing smart home platform
-- All contributors who help make this project better
+- Community members who contribute feedback and suggestions
 
 ---
 
-**Note**: This is the production version of the add-on.
+**Created and maintained by [GaRoN ChillKiller](https://github.com/chillkiller)**
 
-Made with ❤️ by the OpenClaw community
+Made with ❤️ by GaRoN ChillKiller

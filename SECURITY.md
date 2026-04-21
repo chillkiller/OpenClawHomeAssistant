@@ -10,7 +10,7 @@ This document outlines the security risks associated with running the OpenClaw A
 
 This add-on is provided **"AS IS"**, without warranty of any kind, under the [MIT License](LICENSE).
 
-The authors and contributors of this add-on are **not responsible** for any damage, data loss, security breach, unauthorized access, financial loss, or any other harm that may occur as a result of installing, configuring, or using this add-on. This includes but is not limited to:
+The author and maintainer of this add-on are **not responsible** for any damage, data loss, security breach, unauthorized access, financial loss, or any other harm that may occur as a result of installing, configuring, or using this add-on. This includes but is not limited to:
 
 - Unintended actions performed by the AI agent
 - Exposure of sensitive data (tokens, credentials, personal information)
