@@ -978,12 +978,19 @@ if [ "$MDNS_MODE" != "off" ]; then
   if ! pgrep dbus-daemon >/dev/null 2>&1; then
     if command -v dbus-daemon >/dev/null 2>&1; then
       mkdir -p /run/dbus
+      # Clean up stale pid file and socket from previous runs
+      rm -f /run/dbus/pid /run/dbus/system_bus_socket 2>/dev/null || true
       dbus-daemon --system --fork 2>/dev/null || echo "WARN: dbus-daemon failed to start"
-      sleep 1
-      if [ -S /run/dbus/system_bus_socket ]; then
-        echo "INFO: D-Bus system bus started"
-      else
-        echo "WARN: D-Bus socket not found after start"
+      # Wait for D-Bus socket to be available (up to 5 seconds)
+      for _i in $(seq 1 10); do
+        if [ -S /run/dbus/system_bus_socket ]; then
+          echo "INFO: D-Bus system bus started"
+          break
+        fi
+        sleep 0.5
+      done
+      if [ ! -S /run/dbus/system_bus_socket ]; then
+        echo "WARN: D-Bus socket not found after start (avahi may fail)"
       fi
     else
       echo "WARN: dbus-daemon not installed; avahi may fail to start"
@@ -992,23 +999,40 @@ if [ "$MDNS_MODE" != "off" ]; then
     echo "INFO: D-Bus system bus already running"
   fi
 
-  # Add .local entry to avahi hosts if MDNS_HOST_NAME is configured
-  if [ -n "$MDNS_HOST_NAME" ]; then
-    # Add .local entry to avahi hosts file for proper resolution
-    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-    if [ -n "$LAN_IP" ]; then
-      grep -q "$MDNS_HOST_NAME.local" /etc/avahi/hosts 2>/dev/null || \
-        echo "$LAN_IP $MDNS_HOST_NAME.local" >> /etc/avahi/hosts
+  # Generate unique hostname to avoid conflicts with Home Assistant
+  # Use container hostname (e.g., "45b315ab-openclaw-ha-addon") as base
+  CONTAINER_HOSTNAME=$(hostname 2>/dev/null || echo "openclaw")
+  # Sanitize: remove special chars, keep only alphanumeric and hyphens
+  MDNS_HOSTNAME=$(echo "$CONTAINER_HOSTNAME" | sed 's/[^a-zA-Z0-9-]//g')
+  # Fallback to user-provided name if set and valid
+  if [ -n "$MDNS_HOST_NAME" ] && [[ "$MDNS_HOST_NAME" =~ ^[a-zA-Z0-9-]+$ ]]; then
+    MDNS_HOSTNAME="$MDNS_HOST_NAME"
+  fi
+  # Ensure .local suffix
+  MDNS_HOSTNAME="${MDNS_HOSTNAME}.local"
+
+  # Add .local entry to avahi hosts file
+  LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  if [ -n "$LAN_IP" ] && [ -n "$MDNS_HOSTNAME" ]; then
+    mkdir -p /etc/avahi
+    # Update hosts file (replace existing entry for this hostname)
+    if grep -q "$MDNS_HOSTNAME" /etc/avahi/hosts 2>/dev/null; then
+      sed -i "s/^.*$MDNS_HOSTNAME.*$/$LAN_IP $MDNS_HOSTNAME/" /etc/avahi/hosts
+    else
+      echo "$LAN_IP $MDNS_HOSTNAME" >> /etc/avahi/hosts
     fi
-    echo "INFO: Hostname set to $MDNS_HOST_NAME for mDNS"
+    echo "INFO: Hostname set to $MDNS_HOSTNAME for mDNS (IP: $LAN_IP)"
   fi
 
   # Start avahi-daemon if available
   if command -v avahi-daemon >/dev/null 2>&1; then
     if ! pgrep avahi-daemon >/dev/null 2>&1; then
       echo "INFO: Starting avahi-daemon for mDNS discovery..."
-      # Ensure avahi socket dir exists
+      # Ensure avahi socket dir exists with correct permissions
       mkdir -p /run/avahi-daemon 2>/dev/null || true
+      chmod 755 /run/avahi-daemon 2>/dev/null || true
+      # Clean up stale pid file
+      rm -f /run/avahi-daemon/pid 2>/dev/null || true
       # Generate minimal avahi config if missing
       if [ ! -f /etc/avahi/avahi-daemon.conf ]; then
         mkdir -p /etc/avahi
@@ -1017,6 +1041,7 @@ if [ "$MDNS_MODE" != "off" ]; then
 use-ipv4=yes
 use-ipv6=no
 disallow-other-stacks=yes
+host-name=auto
 
 [wide-area]
 enable-wide-area=no
@@ -1025,10 +1050,13 @@ enable-wide-area=no
 publish-hinfo=no
 publish-addresses=yes
 publish-domain=yes
+publish-workstation=no
 AVAHI_CONF
       fi
-      avahi-daemon -D 2>/dev/null || echo "WARN: avahi-daemon failed to start (mDNS may not work)"
-      sleep 1
+      # Start avahi-daemon with --no-drop-root (required in containers)
+      # and --no-chroot to avoid chroot issues
+      avahi-daemon -D --no-drop-root --no-chroot 2>/dev/null || echo "WARN: avahi-daemon failed to start (mDNS may not work)"
+      sleep 2
       if pgrep avahi-daemon >/dev/null 2>&1; then
         echo "INFO: avahi-daemon started successfully"
       else
@@ -1042,7 +1070,9 @@ AVAHI_CONF
   fi
 
   # Configure mDNS in OpenClaw config
-  MDNS_HOSTNAME="${MDNS_HOST_NAME:-$(hostname -f 2>/dev/null || hostname)}"
+  # MDNS_HOSTNAME is already set above (with .local suffix)
+  # Remove .local suffix for OpenClaw config (it adds its own)
+  MDNS_HOSTNAME_FOR_OC="${MDNS_HOSTNAME%.local}"
   MDNS_PORT="${MDNS_SERVICE_PORT:-$GATEWAY_PORT}"
   if [ "$ENABLE_HTTPS_PROXY" = "true" ]; then
     # In HTTPS mode, mDNS must advertise GATEWAY_PORT (the public HTTPS port, e.g. 18789)
@@ -1052,8 +1082,8 @@ AVAHI_CONF
   fi
 
   if [ -f "$HELPER_PATH" ] && [ -f "$OPENCLAW_CONFIG_PATH" ]; then
-    if python3 "$HELPER_PATH" set-mdns-settings "$MDNS_MODE" "$MDNS_PORT" "$MDNS_HOSTNAME" 2>/dev/null; then
-      echo "INFO: mDNS configured (mode=$MDNS_MODE, port=$MDNS_PORT, host=$MDNS_HOSTNAME)"
+    if python3 "$HELPER_PATH" set-mdns-settings "$MDNS_MODE" "$MDNS_PORT" "$MDNS_HOSTNAME_FOR_OC" 2>/dev/null; then
+      echo "INFO: mDNS configured (mode=$MDNS_MODE, port=$MDNS_PORT, host=$MDNS_HOSTNAME_FOR_OC)"
     else
       echo "WARN: mDNS configuration via helper failed"
     fi
@@ -1068,7 +1098,7 @@ AVAHI_CONF
       MDNS_IFACE_FLAG="--iface=$MDNS_INTERFACE_NAME"
     fi
     avahi-publish-service $MDNS_IFACE_FLAG "OpenClaw Gateway" _openclaw._tcp "$MDNS_PORT" \
-      "mode=$MDNS_MODE" "hostname=$MDNS_HOSTNAME" &
+      "mode=$MDNS_MODE" "hostname=$MDNS_HOSTNAME_FOR_OC" &
     echo "INFO: mDNS service _openclaw._tcp published (port=$MDNS_PORT)"
   fi
 else

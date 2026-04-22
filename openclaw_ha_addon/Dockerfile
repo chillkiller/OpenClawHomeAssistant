@@ -1,7 +1,8 @@
-# Dockerfile for OpenClaw Home Assistant Addon v0.7.5.1
+# Dockerfile for OpenClaw Home Assistant Addon v0.7.5.2
 # Multi-stage build for disk space optimization
 # FIXED: Version bump to trigger HA update (HA ignored 0.6.1.4, last broken was 0.6.1.12)
 # FIXED: Added sudo package, HEALTHCHECK for HA Watchdog, run.sh root-safety
+# FIXED v0.7.5.2: dbus-daemon socket wait, avahi --no-drop-root --no-chroot, unique hostname
 FROM debian:trixie-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -193,9 +194,9 @@ RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch
     && chmod +x /usr/local/bin/ttyd
 
 # =============================================================================
-# Install OpenClaw v0.7.5.1 (pinned version)
+# Install OpenClaw v0.7.5.2 (pinned version)
 # =============================================================================
-RUN npm install -g openclaw@2026.4.15 \
+RUN npm install -g openclaw@2026.4.21 \
     && npm install -g pnpm \
     && npm cache clean --force
 
