@@ -973,7 +973,15 @@ echo "INFO: Section 22 done (nginx started)"
 # ------------------------------------------------------------------------------
 # Section 23: mDNS / Avahi Configuration
 # ------------------------------------------------------------------------------
-if [ "$MDNS_MODE" != "off" ]; then
+# Determine if mDNS infrastructure should be started
+# Infrastructure (D-Bus + Avahi) runs if mDNS is configured at all
+# Gateway-specific mDNS mode only controls OpenClaw config and service publishing
+MDNS_CONFIGURED="false"
+if [ -n "$MDNS_MODE" ] && [ "$MDNS_MODE" != "" ]; then
+  MDNS_CONFIGURED="true"
+fi
+
+if [ "$MDNS_CONFIGURED" = "true" ]; then
   # Start D-Bus system bus (required by avahi-daemon in containers)
   if ! pgrep dbus-daemon >/dev/null 2>&1; then
     if command -v dbus-daemon >/dev/null 2>&1; then
@@ -1068,7 +1076,12 @@ AVAHI_CONF
   else
     echo "WARN: avahi-daemon not installed — mDNS will not work. Install avahi-daemon in the Dockerfile."
   fi
+else
+  echo "INFO: mDNS not configured; skipping D-Bus and avahi infrastructure"
+fi
 
+# Gateway-specific mDNS configuration (only when mode is not "off")
+if [ "$MDNS_MODE" != "off" ]; then
   # Configure mDNS in OpenClaw config
   # MDNS_HOSTNAME is already set above (with .local suffix)
   # Remove .local suffix for OpenClaw config (it adds its own)
@@ -1092,7 +1105,7 @@ AVAHI_CONF
   fi
 
   # Optional: publish _openclaw._tcp service via avahi if avahi-publish is available
-  if [ "$MDNS_MODE" != "off" ] && command -v avahi-publish-service >/dev/null 2>&1; then
+  if command -v avahi-publish-service >/dev/null 2>&1; then
     MDNS_IFACE_FLAG=""
     if [ -n "$MDNS_INTERFACE_NAME" ]; then
       MDNS_IFACE_FLAG="--iface=$MDNS_INTERFACE_NAME"
@@ -1102,7 +1115,7 @@ AVAHI_CONF
     echo "INFO: mDNS service _openclaw._tcp published (port=$MDNS_PORT)"
   fi
 else
-  echo "INFO: mDNS mode is off; skipping avahi and mDNS configuration"
+  echo "INFO: mDNS mode is off; skipping gateway mDNS configuration and service publishing"
 fi
 
 echo "INFO: Section 23 done (mDNS/avahi)"
